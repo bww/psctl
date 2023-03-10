@@ -1,5 +1,6 @@
 use std::io;
 use std::fmt;
+use std::time;
 
 use url;
 use reqwest;
@@ -29,6 +30,7 @@ pub enum Error {
   AwaitError(AwaitError),
   ParseURLError(url::ParseError),
   ReqwestError(reqwest::Error),
+  SystemTimeError(std::time::SystemTimeError),
 }
 
 impl From<io::Error> for Error {
@@ -55,6 +57,12 @@ impl From<reqwest::Error> for Error {
   }
 }
 
+impl From<std::time::SystemTimeError> for Error {
+  fn from(err: std::time::SystemTimeError) -> Self {
+    Self::SystemTimeError(err)
+  }
+}
+
 impl fmt::Display for Error {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
@@ -62,6 +70,7 @@ impl fmt::Display for Error {
       Self::AwaitError(err) => err.fmt(f),
       Self::ParseURLError(err) => err.fmt(f),
       Self::ReqwestError(err) => err.fmt(f),
+      Self::SystemTimeError(err) => err.fmt(f),
     }
   }
 }
