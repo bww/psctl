@@ -33,7 +33,7 @@ async fn main() {
 async fn cmd() -> Result<(), error::Error> {
   let opts = Options::parse();
   
-  let mut procs  = Vec::new();
+  let mut procs = Vec::new();
   let mut checks: Vec<String> = Vec::new();
   for e in &opts.specs {
     let proc = runner::Process::parse(e)?;
@@ -41,10 +41,10 @@ async fn cmd() -> Result<(), error::Error> {
       Some(url) => checks.push(url.to_string()),
       None => {},
     };
-    println!("----> {}", &proc);
-    proc.exec().await?;
     procs.push(proc);
   }
+  
+  runner::Pod::new(procs).exec().await?;
   
   waiter::wait(&checks, time::Duration::from_secs(10)).await?;
   

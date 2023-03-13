@@ -2,8 +2,11 @@ pub mod error;
 
 use std::fmt;
 use std::result;
+use std::pin::Pin;
 
 use tokio::process;
+use futures::Future;
+use futures::future::try_join_all;
 
 type Result<T> = result::Result<T, error::Error>;
 
@@ -18,7 +21,13 @@ impl Pod {
     }
   }
   
-  pub fn exec() -> Result<()> {
+  pub async fn exec(&self) -> Result<()> {
+    let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<()>>>>> = Vec::new();
+    for proc in &self.procs {
+      println!("----> {}", proc);
+      jobs.push(Box::pin(proc.exec()));
+    }
+    try_join_all(jobs).await?;
     Ok(())
   }
 }
@@ -60,10 +69,7 @@ impl Process {
   }
   
   pub async fn exec(&self) -> Result<()> {
-    let mut proc = match process::Command::new("echo")
-      .arg("hello")
-      .arg("world")
-      .spawn() {
+    let mut proc = match process::Command::new("sh").arg("-c").arg(&self.command).spawn() {
       Ok(proc) => proc,
       Err(err) => return Err(error::ExecError::new(&format!("Could not spawn process: {}", err)).into()),
     };
