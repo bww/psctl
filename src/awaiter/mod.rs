@@ -13,7 +13,7 @@ use tokio::time::sleep;
 
 type Result<T> = result::Result<T, error::Error>;
 
-pub async fn check(urls: &Vec<String>, timeout: time::Duration) -> Result<()> {
+pub async fn wait(urls: Vec<&str>, timeout: time::Duration) -> Result<()> {
   let deadline = SystemTime::now() + timeout;
   let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<()>>>>> = Vec::new();
   for base in urls {
