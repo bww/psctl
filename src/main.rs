@@ -4,9 +4,9 @@ use std::process;
 use tokio;
 use clap::Parser;
 
-mod awaiter;
-
-use crate::awaiter::error;
+mod waiter;
+mod runner;
+mod error;
 
 #[derive(Parser, Debug, Clone)]
 #[clap(author, version, about, long_about = None)]
@@ -32,5 +32,20 @@ async fn main() {
 
 async fn cmd() -> Result<(), error::Error> {
   let opts = Options::parse();
-  awaiter::wait(&opts.specs, time::Duration::from_secs(10)).await
+  
+  let mut procs  = Vec::new();
+  let mut checks: Vec<String> = Vec::new();
+  for e in &opts.specs {
+    let proc = runner::Process::parse(e)?;
+    match &proc.check() {
+      Some(url) => checks.push(url.to_string()),
+      None => {},
+    };
+    println!("----> {}", &proc);
+    procs.push(proc);
+  }
+  
+  waiter::wait(&checks, time::Duration::from_secs(10)).await?;
+  
+  Ok(())
 }
