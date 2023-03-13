@@ -3,7 +3,25 @@ pub mod error;
 use std::fmt;
 use std::result;
 
+use tokio::process;
+
 type Result<T> = result::Result<T, error::Error>;
+
+pub struct Pod {
+  procs: Vec<Process>,
+}
+
+impl Pod {
+  pub fn new(procs: Vec<Process>) -> Pod {
+    Pod{
+      procs: procs,
+    }
+  }
+  
+  pub fn exec() -> Result<()> {
+    Ok(())
+  }
+}
 
 pub struct Process {
   command: String,
@@ -39,6 +57,23 @@ impl Process {
       Some(url) => Some(url),
       None => None,
     }
+  }
+  
+  pub async fn exec(&self) -> Result<()> {
+    let mut proc = match process::Command::new("echo")
+      .arg("hello")
+      .arg("world")
+      .spawn() {
+      Ok(proc) => proc,
+      Err(err) => return Err(error::ExecError::new(&format!("Could not spawn process: {}", err)).into()),
+    };
+    
+    let stat = match proc.wait().await {
+      Ok(stat) => stat,
+      Err(err) => return Err(error::ExecError::new(&format!("Could not exec process: {}", err)).into()),
+    };
+    
+    Ok(())
   }
 }
 

@@ -42,6 +42,7 @@ async fn cmd() -> Result<(), error::Error> {
       None => {},
     };
     println!("----> {}", &proc);
+    proc.exec().await?;
     procs.push(proc);
   }
   
