@@ -1,6 +1,5 @@
 use std::io;
 use std::fmt;
-use std::time;
 
 use url;
 use reqwest;

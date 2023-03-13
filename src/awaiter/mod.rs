@@ -36,12 +36,10 @@ where
   let wait = time::Duration::from_secs(1);
   loop {
     let before = SystemTime::now();
-    println!(">>> Polling: {}", url);
     if match func(url.to_string(), deadline.duration_since(SystemTime::now())?).await {
-      Ok(res)  => res,
-      Err(err) => false,
+      Ok(res) => res,
+      Err(_)  => false, // maybe log this?
     } {
-      println!("... OK! {}", url);
       return Ok(()); // success
     }
     let after = SystemTime::now();
@@ -50,7 +48,6 @@ where
     } else {
       let elapsed = after.duration_since(before)?;
       if elapsed < wait {
-        println!("... Waiting: {:?}", wait - elapsed);
         sleep(wait - elapsed).await;
       }
     }
@@ -60,16 +57,16 @@ where
 async fn wait_http(url: &str, deadline: SystemTime) -> Result<()> {
   wait_fn(url, deadline, |u, t| {
     Box::pin(async move {
-      Ok(match reqwest::Client::new().get(u).timeout(t).send().await {
-        Ok(rsp)  => rsp.status().is_success(),
-        Err(err) => false,
-      })
+      match reqwest::Client::new().get(u).timeout(t).send().await {
+        Ok(rsp)  => Ok(rsp.status().is_success()),
+        Err(err) => Err(err.into()),
+      }
     })
   }).await
 }
 
 async fn wait_file(url: &str, deadline: SystemTime) -> Result<()> {
-  wait_fn(url, deadline, |u, t| {
+  wait_fn(url, deadline, |u, _| {
     Box::pin(async move {
       match url::Url::parse(&u) {
         Ok(u)    => Ok(path::Path::new(u.path()).exists()),
