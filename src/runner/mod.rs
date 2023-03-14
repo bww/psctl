@@ -5,8 +5,10 @@ use std::result;
 use std::pin::Pin;
 
 use tokio::process;
+use tokio::sync::mpsc;
 use futures::Future;
-use futures::future::try_join_all;
+use futures::stream;
+use futures::stream::TryStreamExt;
 
 type Result<T> = result::Result<T, error::Error>;
 
@@ -27,7 +29,10 @@ impl Pod {
       println!("----> {}", proc);
       jobs.push(Box::pin(proc.exec()));
     }
-    try_join_all(jobs).await?;
+    
+    let mut jobs = stream::FuturesUnordered::from_iter(jobs);
+    let _ = jobs.try_next().await?;
+    
     Ok(())
   }
 }
