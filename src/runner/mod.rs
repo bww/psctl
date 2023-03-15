@@ -3,6 +3,7 @@ pub mod error;
 use std::fmt;
 use std::result;
 use std::pin::Pin;
+use std::collections::HashSet;
 
 use tokio::process;
 use tokio::sync::mpsc;
@@ -60,6 +61,7 @@ impl Process {
     }
   }
   
+  // <label>: <command>=<check url> (<dep1>,<dep2>)
   pub fn parse(text: &str) -> Result<Process> {
     let split: Vec<&str> = text.splitn(2, ":").collect();
     let (label, text) = match split.len() {
@@ -88,6 +90,10 @@ impl Process {
       Some(label) => Some(label),
       None => None,
     }
+  }
+  
+  pub fn deps<'a>(&'a self) -> &'a Vec<String> {
+    &self.deps
   }
   
   pub fn command<'a>(&'a self) -> &'a str {
@@ -136,4 +142,43 @@ impl fmt::Debug for Process {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     fmt::Display::fmt(self, f)
   }
+}
+
+fn order_procs(procs: Vec<Process>) -> Result<Vec<Process>> {
+  let mut ord: Vec<Process> = Vec::new();
+  let mut sub: HashSet<String> = HashSet::new();
+  
+  for proc in procs {
+    ord.append(order_procs_sub(&proc, &sub)?);
+  }
+  
+  Ok(ord)
+}
+
+fn order_procs_sub(proc: &Process, sub: &mut HashSet<String>) -> Result<Vec<Process>> {
+  let key = match proc.label() {
+    Some(label) => label,
+    None => proc.command(),
+  };
+  
+  if sub.contains(key) {
+    return Ok(Vec::new());
+  }
+  
+  let mut ord: Vec<Process> = Vec::new();
+  for dep in proc.deps() {
+    ord.append(order_procs_sub(dep
+  }
+  
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  
+  #[test]
+  fn test_resolve_deps() {
+    // assert_eq!(Ok(chrono::Duration::seconds(1)), parse_duration("1s"));
+  }
+  
 }
