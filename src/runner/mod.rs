@@ -155,33 +155,35 @@ impl fmt::Debug for Process {
 
 fn order_procs<'a>(procs: Vec<&'a Process>) -> Result<Vec<&'a Process>> {
   let mut ord: Vec<&'a Process> = Vec::new();
-  let mut sub: HashSet<String> = HashSet::new();
+  let mut vis: HashSet<String> = HashSet::new();
   let mut set: HashMap<String, &'a Process> = HashMap::new();
   
   for proc in &procs {
     set.insert(proc.key().to_string(), proc);
   }
   for proc in &procs {
-    ord.append(&mut order_procs_sub(proc, &set, &mut sub)?);
+    ord.append(&mut order_procs_sub(proc, &set, &mut vis)?);
   }
   
   Ok(ord)
 }
 
-fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, sub: &mut HashSet<String>) -> Result<Vec<&'a Process>> {
+fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, vis: &mut HashSet<String>) -> Result<Vec<&'a Process>> {
   let key = match proc.label() {
     Some(label) => label,
     None => proc.command(),
   };
   
   let mut ord: Vec<&'a Process> = Vec::new();
-  if !sub.contains(key) {
+  if !vis.contains(key) {
     for dep in proc.deps() {
       match set.get(dep) {
-        Some(dep) => ord.append(&mut order_procs_sub(dep, set, sub)?),
+        Some(dep) => ord.append(&mut order_procs_sub(dep, set, vis)?),
         None => return Err(error::ExecError::new(&format!("Unknown dependency: {}", dep)).into()),
       };
     }
+    vis.insert(key.to_owned());
+    ord.push(proc);
   }
   
   Ok(ord)
@@ -193,11 +195,12 @@ mod tests {
   
   #[test]
   fn test_resolve_deps() {
-    let p1 = Process::new(Some("p1"), "p1", vec![], None);
-    let p2 = Process::new(Some("p2"), "p2", vec!["p1"], None);
+    let p1 = Process::new(Some("p1"), "proc 1", vec![], None);
+    let p2 = Process::new(Some("p2"), "proc 2", vec!["p1"], None);
+    let p3 = Process::new(Some("p3"), "proc 3", vec!["p2", "p1"], None);
     
-    match order_procs(vec![&p2, &p1]) {
-      Ok(res)  => assert_eq!(vec![&p1, &p2], res),
+    match order_procs(vec![&p2, &p3, &p1]) {
+      Ok(res)  => assert_eq!(vec![&p1, &p2, &p3], res),
       Err(err) => panic!("{}", err),
     };
   }
