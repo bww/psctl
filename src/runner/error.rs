@@ -20,10 +20,24 @@ impl fmt::Display for ExecError {
   }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum DependencyError {
+  Cycle(String),
+}
+
+impl fmt::Display for DependencyError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Cycle(msg) => write!(f, "Cycle: {}", msg),
+    }
+  }
+}
+
 #[derive(Debug)]
 pub enum Error {
   IOError(io::Error),
   ExecError(ExecError),
+  DependencyError(DependencyError),
 }
 
 impl From<io::Error> for Error {
@@ -38,11 +52,18 @@ impl From<ExecError> for Error {
   }
 }
 
+impl From<DependencyError> for Error {
+  fn from(err: DependencyError) -> Self {
+    Self::DependencyError(err)
+  }
+}
+
 impl fmt::Display for Error {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::IOError(err) => err.fmt(f),
       Self::ExecError(err) => err.fmt(f),
+      Self::DependencyError(err) => err.fmt(f),
     }
   }
 }

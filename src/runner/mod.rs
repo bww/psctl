@@ -162,13 +162,13 @@ fn order_procs<'a>(procs: Vec<&'a Process>) -> Result<Vec<&'a Process>> {
     set.insert(proc.key().to_string(), proc);
   }
   for proc in &procs {
-    ord.append(&mut order_procs_sub(proc, &set, &mut vis)?);
+    ord.append(&mut order_procs_sub(proc, &set, &mut HashSet::new(), &mut vis)?);
   }
   
   Ok(ord)
 }
 
-fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, vis: &mut HashSet<String>) -> Result<Vec<&'a Process>> {
+fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, run: &mut HashSet<String>, vis: &mut HashSet<String>) -> Result<Vec<&'a Process>> {
   let key = match proc.label() {
     Some(label) => label,
     None => proc.command(),
@@ -177,10 +177,15 @@ fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, vi
   let mut ord: Vec<&'a Process> = Vec::new();
   if !vis.contains(key) {
     for dep in proc.deps() {
+      if run.contains(dep) {
+        return Err(error::DependencyError::Cycle(format!("{} in {:?}", dep, run)).into());
+      }
+      run.insert(dep.to_owned());
       match set.get(dep) {
-        Some(dep) => ord.append(&mut order_procs_sub(dep, set, vis)?),
+        Some(dep) => ord.append(&mut order_procs_sub(dep, set, run, vis)?),
         None => return Err(error::ExecError::new(&format!("Unknown dependency: {}", dep)).into()),
       };
+      run.remove(dep);
     }
     vis.insert(key.to_owned());
     ord.push(proc);
@@ -204,10 +209,21 @@ mod tests {
       Ok(res)  => assert_eq!(vec![&p1, &p2, &p3], res),
       Err(err) => panic!("{}", err),
     };
-    
     match order_procs(vec![&p2, &p4, &p3, &p1]) {
       Ok(res)  => assert_eq!(vec![&p1, &p2, &p4, &p3], res),
       Err(err) => panic!("{}", err),
+    };
+    
+    // circular
+    let p5 = Process::new(Some("p5"), "proc 5", vec!["p6"], None);
+    let p6 = Process::new(Some("p6"), "proc 6", vec!["p5"], None);
+    
+    match order_procs(vec![&p5, &p6]) {
+      Ok(res)  => panic!("Cannot succeed!"),
+      Err(err) => match err {
+        error::Error::DependencyError(error::DependencyError::Cycle(msg)) => {}, // expected error
+        _ => panic!("Unexpected error: {}", err),
+      },
     };
   }
   
