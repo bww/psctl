@@ -198,9 +198,15 @@ mod tests {
     let p1 = Process::new(Some("p1"), "proc 1", vec![], None);
     let p2 = Process::new(Some("p2"), "proc 2", vec!["p1"], None);
     let p3 = Process::new(Some("p3"), "proc 3", vec!["p2", "p1"], None);
+    let p4 = Process::new(Some("p4"), "proc 4", vec!["p1"], None);
     
     match order_procs(vec![&p2, &p3, &p1]) {
       Ok(res)  => assert_eq!(vec![&p1, &p2, &p3], res),
+      Err(err) => panic!("{}", err),
+    };
+    
+    match order_procs(vec![&p2, &p4, &p3, &p1]) {
+      Ok(res)  => assert_eq!(vec![&p1, &p2, &p4, &p3], res),
       Err(err) => panic!("{}", err),
     };
   }
