@@ -1,7 +1,7 @@
 use std::io;
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ExecError {
   message: String,
 }

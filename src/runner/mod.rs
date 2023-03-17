@@ -4,10 +4,11 @@ use std::fmt;
 use std::result;
 use std::pin::Pin;
 use std::collections::HashSet;
+use std::collections::HashMap;
 
 use tokio::process;
-use tokio::sync::mpsc;
-use futures::Future;
+// use tokio::sync::mpsc;
+// use futures::Future;
 use futures::stream;
 use futures::stream::TryStreamExt;
 
@@ -38,6 +39,7 @@ impl Pod {
   }
 }
 
+#[derive(PartialEq, Eq)]
 pub struct Process {
   command: String,
   label: Option<String>,
@@ -83,6 +85,13 @@ impl Process {
     //   1 => Ok(Self::new(split[0], None)),
     //   _ => Err(error::ExecError::new(&format!("Invalid process format: {}", text)).into()),
     // }
+  }
+  
+  fn key<'a>(&'a self) -> &'a str {
+    match self.label() {
+      Some(label) => label,
+      None => self.command(),
+    }
   }
   
   pub fn label<'a>(&'a self) -> Option<&'a str> {
@@ -144,32 +153,38 @@ impl fmt::Debug for Process {
   }
 }
 
-fn order_procs(procs: Vec<Process>) -> Result<Vec<Process>> {
-  let mut ord: Vec<Process> = Vec::new();
+fn order_procs<'a>(procs: Vec<&'a Process>) -> Result<Vec<&'a Process>> {
+  let mut ord: Vec<&'a Process> = Vec::new();
   let mut sub: HashSet<String> = HashSet::new();
+  let mut set: HashMap<String, &'a Process> = HashMap::new();
   
-  for proc in procs {
-    ord.append(order_procs_sub(&proc, &sub)?);
+  for proc in &procs {
+    set.insert(proc.key().to_string(), proc);
+  }
+  for proc in &procs {
+    ord.append(&mut order_procs_sub(proc, &set, &mut sub)?);
   }
   
   Ok(ord)
 }
 
-fn order_procs_sub(proc: &Process, sub: &mut HashSet<String>) -> Result<Vec<Process>> {
+fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, sub: &mut HashSet<String>) -> Result<Vec<&'a Process>> {
   let key = match proc.label() {
     Some(label) => label,
     None => proc.command(),
   };
   
-  if sub.contains(key) {
-    return Ok(Vec::new());
+  let mut ord: Vec<&'a Process> = Vec::new();
+  if !sub.contains(key) {
+    for dep in proc.deps() {
+      match set.get(dep) {
+        Some(dep) => ord.append(&mut order_procs_sub(dep, set, sub)?),
+        None => return Err(error::ExecError::new(&format!("Unknown dependency: {}", dep)).into()),
+      };
+    }
   }
   
-  let mut ord: Vec<Process> = Vec::new();
-  for dep in proc.deps() {
-    ord.append(order_procs_sub(dep
-  }
-  
+  Ok(ord)
 }
 
 #[cfg(test)]
@@ -178,7 +193,13 @@ mod tests {
   
   #[test]
   fn test_resolve_deps() {
-    // assert_eq!(Ok(chrono::Duration::seconds(1)), parse_duration("1s"));
+    let p1 = Process::new(Some("p1"), "p1", vec![], None);
+    let p2 = Process::new(Some("p2"), "p2", vec!["p1"], None);
+    
+    match order_procs(vec![&p2, &p1]) {
+      Ok(res)  => assert_eq!(vec![&p1, &p2], res),
+      Err(err) => panic!("{}", err),
+    };
   }
   
 }
