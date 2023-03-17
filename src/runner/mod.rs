@@ -7,8 +7,6 @@ use std::collections::HashSet;
 use std::collections::HashMap;
 
 use tokio::process;
-// use tokio::sync::mpsc;
-// use futures::Future;
 use futures::stream;
 use futures::stream::TryStreamExt;
 
@@ -26,8 +24,10 @@ impl Pod {
   }
   
   pub async fn exec(&self) -> Result<()> {
+    let ord: Vec<&Process> = order_procs(self.procs.iter().map(|e| e).collect())?;
+    
     let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<()>>>>> = Vec::new();
-    for proc in &self.procs {
+    for proc in &ord {
       println!("----> {}", proc);
       jobs.push(Box::pin(proc.exec()));
     }
@@ -63,13 +63,25 @@ impl Process {
     }
   }
   
-  // <label>: <command>=<check url> (<dep1>,<dep2>)
+  // <label> [+ <dep1> [, ...]]: <command>=<check url>
   pub fn parse(text: &str) -> Result<Process> {
     let split: Vec<&str> = text.splitn(2, ":").collect();
     let (label, text) = match split.len() {
       2 => (Some(split[0].trim()), split[1].trim()),
       1 => (None, text),
       _ => return Err(error::ExecError::new(&format!("Invalid process format: {}", text)).into()),
+    };
+    
+    let (label, deps) = match label {
+      Some(label) => {
+        let split: Vec<&str> = label.splitn(2, "+").collect();
+        match split.len() {
+          2 => (Some(split[0].trim()), split[1].trim().split(",").map(|e| e.trim()).collect()),
+          1 => (Some(label), Vec::new()),
+          _ => return Err(error::ExecError::new(&format!("Invalid process format: {}", text)).into()),
+        }
+      },
+      None => (label, Vec::new()),
     };
     
     let split: Vec<&str> = text.splitn(2, "=").collect();
@@ -79,12 +91,7 @@ impl Process {
       _ => return Err(error::ExecError::new(&format!("Invalid process format: {}", text)).into()),
     };
     
-    Ok(Self::new(label, cmd, Vec::new(), check))
-    // let (cmd, check) = match split.len() {
-    //   2 => Ok(Self::new(split[0], Some(split[1]))),
-    //   1 => Ok(Self::new(split[0], None)),
-    //   _ => Err(error::ExecError::new(&format!("Invalid process format: {}", text)).into()),
-    // }
+    Ok(Self::new(label, cmd, deps, check))
   }
   
   fn key<'a>(&'a self) -> &'a str {
