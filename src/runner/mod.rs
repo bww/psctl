@@ -10,6 +10,7 @@ use std::collections::HashMap;
 
 use tokio::process;
 use futures::stream;
+use futures::future::FutureExt;
 use futures::stream::TryStreamExt;
 
 use crate::waiter;
@@ -128,29 +129,28 @@ impl Process {
   }
   
   pub async fn exec(&self) -> Result<()> {
-    let mut proc = match process::Command::new("sh").arg("-c").arg(self.command()).spawn() {
-      Ok(proc) => proc,
-      Err(err) => return Err(error::ExecError::new(&format!("Could not spawn process: {}", err)).into()),
-    };
-    
-    let f1 = proc.wait();
-    // let f2 = waiter::wait_jobs(urls, time::Duration::from_secs(10))?;
-    if let Some(check) = self.check() {
-      waiter::wait(&vec![check.to_string()], time::Duration::from_secs(10)).await?;
-    }
-    
-    // let stat = match proc.wait().await {
-    //   Ok(stat) => stat,
-    //   Err(err) => return Err(error::ExecError::new(&format!("Could not exec process: {}", err)).into()),
-    // };
-    
-    let stat = match f1.await {
+    let stat = match self.exec_async()?.await {
       Ok(stat) => stat,
       Err(err) => return Err(error::ExecError::new(&format!("Could not exec process: {}", err)).into()),
     };
     
     println!(">>> {}: {}", self.command(), stat);
     Ok(())
+  }
+  
+  pub fn exec_async(&self) -> Result<Pin<Box<dyn futures::Future<Output = Result<bool>>>>> {
+    let mut proc = match process::Command::new("sh").arg("-c").arg(self.command()).spawn() {
+      Ok(proc) => proc,
+      Err(err) => return Err(error::ExecError::new(&format!("Could not spawn process: {}", err)).into()),
+    };
+    
+    let f1 = proc.wait().map(|f| Ok(f.is_ok()));
+    
+    // if let Some(check) = self.check() {
+      // waiter::wait(&vec![check.to_string()], time::Duration::from_secs(10)).await?;
+    // }
+    
+    Ok(Box::pin(f1))
   }
 }
 
