@@ -129,6 +129,9 @@ impl Process {
       Err(err) => return Err(error::ExecError::new(&format!("Could not spawn process: {}", err)).into()),
     };
     
+    // let f1 = proc.wait();
+    // let f2 = 
+    
     let stat = match proc.wait().await {
       Ok(stat) => stat,
       Err(err) => return Err(error::ExecError::new(&format!("Could not exec process: {}", err)).into()),

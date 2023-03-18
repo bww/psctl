@@ -14,6 +14,11 @@ use tokio::time::sleep;
 type Result<T> = result::Result<T, error::Error>;
 
 pub async fn wait(urls: &Vec<String>, timeout: time::Duration) -> Result<()> {
+  try_join_all(wait_jobs(urls, timeout)?).await?;
+  Ok(())
+}
+
+pub fn wait_jobs<'a>(urls: &'a Vec<String>, timeout: time::Duration) -> Result<Vec<Pin<Box<dyn futures::Future<Output = Result<()>> + 'a>>>> {
   let deadline = SystemTime::now() + timeout;
   let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<()>>>>> = Vec::new();
   for base in urls {
@@ -25,8 +30,7 @@ pub async fn wait(urls: &Vec<String>, timeout: time::Duration) -> Result<()> {
       _                => return Err(error::AwaitError::new(&format!("Scheme '{}' not supported: {}", scheme, base)).into())
     }
   }
-  try_join_all(jobs).await?;
-  Ok(())
+  Ok(jobs)
 }
 
 async fn wait_fn<F>(url: &str, deadline: SystemTime, func: F) -> Result<()> 
