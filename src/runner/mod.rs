@@ -12,6 +12,7 @@ use tokio::process;
 use futures::stream;
 use futures::future::FutureExt;
 use futures::stream::TryStreamExt;
+use serde::{Serialize, Deserialize};
 
 use crate::waiter;
 
@@ -62,11 +63,15 @@ impl Pod {
   }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Serialize, Deserialize)]
 pub struct Process {
+  #[serde(rename(serialize="run", deserialize="run"))]
   command: String,
+  #[serde(rename(serialize="name", deserialize="name"))]
   label: Option<String>,
+  #[serde(default="Vec::new")]
   deps: Vec<String>,
+  #[serde(default="Vec::new")]
   checks: Vec<String>,
 }
 
