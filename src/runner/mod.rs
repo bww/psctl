@@ -31,15 +31,20 @@ impl Pod {
   pub async fn exec(&self) -> Result<()> {
     let ord: Vec<&Process> = order_procs(self.procs.iter().map(|e| e).collect())?;
     
-    let mut pset: Vec<process::Child> = Vec::new();
-    for proc in &ord {
-      println!("----> {}", proc);
-      pset.push(proc.proc()?);
+    let mut pset: Vec<(&Process, process::Child)> = Vec::new();
+    for spec in &ord {
+      println!("----> {}", spec);
+      pset.push((spec, spec.proc()?));
     }
     
     let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<bool>>>>> = Vec::new();
-    for proc in &mut pset {
+    for (spec, proc) in &mut pset {
       jobs.push(Box::pin(proc.wait().map(|f| Ok(f.is_ok()))));
+      if let Some(check) = spec.check() {
+        println!(">>> >>> >>> AWAIT: {}", check);
+        waiter::wait(&vec![check.to_string()], time::Duration::from_secs(10)).await?;
+        println!(">>> >>> >>> CMPLT: {}", check);
+      }
     }
     
     let mut jobs = stream::FuturesUnordered::from_iter(jobs);

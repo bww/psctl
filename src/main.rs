@@ -46,7 +46,7 @@ async fn cmd() -> Result<(), error::Error> {
   
   runner::Pod::new(procs).exec().await?;
   
-  waiter::wait(&checks, time::Duration::from_secs(10)).await?;
+  // waiter::wait(&checks, time::Duration::from_secs(10)).await?;
   
   Ok(())
 }
