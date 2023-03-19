@@ -30,20 +30,20 @@ impl Pod {
   
   pub async fn exec(&self) -> Result<()> {
     let ord: Vec<&Process> = order_procs(self.procs.iter().map(|e| e).collect())?;
-    
     let mut tset: Vec<(&Process, process::Command)> = Vec::new();
     for spec in &ord {
-      println!("----> {}", spec);
       tset.push((spec, spec.task()?));
     }
     
+    println!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", "));
     let mut pset: Vec<process::Child> = Vec::new();
     for (spec, task) in &mut tset {
-      let mut proc = task.spawn()?;
+      let proc = task.spawn()?;
+      println!("----> {}", spec);
       if let Some(check) = spec.check() {
-        println!(">>> >>> >>> AWAIT: {}", check);
+        // println!("----> {}: {}", spec.key(), check);
         waiter::wait(&vec![check.to_string()], time::Duration::from_secs(10)).await?;
-        println!(">>> >>> >>> CMPLT: {}", check);
+        // println!("----> {}", check);
       }
       pset.push(proc);
     }
@@ -56,6 +56,7 @@ impl Pod {
     let mut jobs = stream::FuturesUnordered::from_iter(jobs);
     let _ = jobs.try_next().await?;
     
+    println!("====> finished");
     Ok(())
   }
 }
@@ -144,17 +145,14 @@ impl Process {
     }
   }
   
-  pub async fn exec(&self) -> Result<()> {
-    let stat = match self.proc()?.wait().await {
-      Ok(stat) => stat,
-      Err(err) => return Err(error::ExecError::new(&format!("Could not exec process: {}", err)).into()),
-    };
-    
-    println!(">>> {}: {}", self.command(), stat);
-    Ok(())
+  pub async fn _exec(&self) -> Result<()> {
+    match self._proc()?.wait().await {
+      Ok(_stat) => Ok(()),
+      Err(err)  => Err(error::ExecError::new(&format!("Could not exec process: {}", err)).into()),
+    }
   }
   
-  fn proc(&self) -> Result<process::Child> {
+  fn _proc(&self) -> Result<process::Child> {
     match self.task()?.spawn() {
       Ok(proc) => Ok(proc),
       Err(err) => return Err(error::ExecError::new(&format!("Could not spawn process: {}", err)).into()),
@@ -164,6 +162,7 @@ impl Process {
   fn task(&self) -> Result<process::Command> {
     let mut cmd = process::Command::new("sh");
     cmd.arg("-c").arg(self.command());
+    cmd.kill_on_drop(true);
     Ok(cmd)
   }
 }
