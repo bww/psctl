@@ -16,8 +16,8 @@ pub struct Options {
   pub debug: bool,
   #[clap(long, help="Enable verbose output")]
   pub verbose: bool,
-  #[clap(long, help="Use process specification file")]
-  pub file: Option<String>,
+  #[clap(long, help="Use task specification config")]
+  pub config: Option<String>,
   #[clap(help="Processes to manage")]
   pub specs: Vec<String>,
 }
@@ -36,7 +36,7 @@ async fn main() {
 async fn cmd() -> Result<(), error::Error> {
   let opts = Options::parse();
   
-  let procs = if let Some(file) = &opts.file {
+  let procs = if let Some(file) = &opts.config {
     read_procs(file)?.tasks
   }else{
     let mut procs = Vec::new();

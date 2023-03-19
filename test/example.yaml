@@ -1,0 +1,25 @@
+version: 1
+tasks:
+  -
+    name: a
+    run: sleep 3 && echo "A"
+    checks:
+      - http://localhost:4000/delay?for=2s
+      - http://localhost:4000/delay?for=3s
+    deps:
+      - b
+      - c
+
+  -
+    name: b
+    run: sleep 10 && echo "B"
+    checks:
+      - http://localhost:4000/delay?for=2s
+
+  -
+    name: c
+    run: sleep 10 && echo "c"
+    checks:
+      - http://localhost:4000/delay?for=2s
+    deps:
+      - b
