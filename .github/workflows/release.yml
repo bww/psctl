@@ -19,13 +19,8 @@ jobs:
           override: true
       - name: Build
         run: cargo build --release --all-features
-      - name: Prepare release
-        run: |
-          package=psctl-${{ github.ref_name }}-linux-x86_64
-          mkdir -p $package/bin && cp target/release/psctl $package/bin/psctl
-          mkdir -p $package/etc && cp -r etc/static/template $package/etc/template
       - name: Package release
-        run: tar -zcvf psctl-${{ github.ref_name }}-linux-x86_64.tgz psctl-${{ github.ref_name }}-linux-x86_64
+        run: tar -zcvf psctl-${{ github.ref_name }}-linux-x86_64.tgz target/release/psctl
       - name: Create release
         id: create_release
         uses: actions/create-release@v1
