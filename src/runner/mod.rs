@@ -31,20 +31,26 @@ impl Pod {
   pub async fn exec(&self) -> Result<()> {
     let ord: Vec<&Process> = order_procs(self.procs.iter().map(|e| e).collect())?;
     
-    let mut pset: Vec<(&Process, process::Child)> = Vec::new();
+    let mut tset: Vec<(&Process, process::Command)> = Vec::new();
     for spec in &ord {
       println!("----> {}", spec);
-      pset.push((spec, spec.proc()?));
+      tset.push((spec, spec.task()?));
     }
     
-    let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<bool>>>>> = Vec::new();
-    for (spec, proc) in &mut pset {
-      jobs.push(Box::pin(proc.wait().map(|f| Ok(f.is_ok()))));
+    let mut pset: Vec<process::Child> = Vec::new();
+    for (spec, task) in &mut tset {
+      let mut proc = task.spawn()?;
       if let Some(check) = spec.check() {
         println!(">>> >>> >>> AWAIT: {}", check);
         waiter::wait(&vec![check.to_string()], time::Duration::from_secs(10)).await?;
         println!(">>> >>> >>> CMPLT: {}", check);
       }
+      pset.push(proc);
+    }
+    
+    let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<bool>>>>> = Vec::new();
+    for proc in &mut pset {
+      jobs.push(Box::pin(proc.wait().map(|f| Ok(f.is_ok()))));
     }
     
     let mut jobs = stream::FuturesUnordered::from_iter(jobs);
@@ -149,10 +155,16 @@ impl Process {
   }
   
   fn proc(&self) -> Result<process::Child> {
-    match process::Command::new("sh").arg("-c").arg(self.command()).spawn() {
+    match self.task()?.spawn() {
       Ok(proc) => Ok(proc),
       Err(err) => return Err(error::ExecError::new(&format!("Could not spawn process: {}", err)).into()),
     }
+  }
+  
+  fn task(&self) -> Result<process::Command> {
+    let mut cmd = process::Command::new("sh");
+    cmd.arg("-c").arg(self.command());
+    Ok(cmd)
   }
 }
 
