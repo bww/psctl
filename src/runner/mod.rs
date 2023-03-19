@@ -29,7 +29,7 @@ impl Pod {
     }
   }
   
-  pub async fn exec(&self) -> Result<()> {
+  pub async fn exec(&self) -> Result<i32> {
     let ord: Vec<&Process> = order_procs(self.procs.iter().map(|e| e).collect())?;
     let mut tset: Vec<(&Process, process::Command)> = Vec::new();
     for spec in &ord {
@@ -43,23 +43,27 @@ impl Pod {
       println!("----> {}", spec);
       let checks = spec.checks();
       if checks.len() > 0 {
-        // println!("----> {}: {}", spec.key(), check);
         waiter::wait(checks, time::Duration::from_secs(10)).await?;
-        // println!("----> {}", check);
       }
       pset.push(proc);
     }
     
-    let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<bool>>>>> = Vec::new();
+    let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<i32>>>>> = Vec::new();
     for proc in &mut pset {
-      jobs.push(Box::pin(proc.wait().map(|f| Ok(f.is_ok()))));
+      jobs.push(Box::pin(proc.wait().map(|f| match f?.code() {
+        Some(code) => Ok(code),
+        None => Ok(0),
+      })));
     }
     
     let mut jobs = stream::FuturesUnordered::from_iter(jobs);
-    let _ = jobs.try_next().await?;
+    let code = match jobs.try_next().await? {
+      Some(code) => code,
+      None => 0,
+    };
     
     println!("====> finished");
-    Ok(())
+    Ok(code)
   }
 }
 

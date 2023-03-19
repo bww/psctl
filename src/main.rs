@@ -25,7 +25,7 @@ pub struct Options {
 #[tokio::main]
 async fn main() {
   match cmd().await {
-    Ok(_)     => {},
+    Ok(code)  => process::exit(code),
     Err(err)  => {
       eprintln!("* * * {}", err);
       process::exit(1);
@@ -33,7 +33,7 @@ async fn main() {
   };
 }
 
-async fn cmd() -> Result<(), error::Error> {
+async fn cmd() -> Result<i32, error::Error> {
   let opts = Options::parse();
   
   let procs = if let Some(file) = &opts.config {
@@ -47,7 +47,7 @@ async fn cmd() -> Result<(), error::Error> {
   };
   
   if procs.len() < 1 {
-    Ok(()) // nothing to do
+    Ok(0) // nothing to do
   }else{
     Ok(runner::Pod::new(procs).exec().await?)
   }
