@@ -14,7 +14,7 @@ pub struct Options {
   pub debug: bool,
   #[clap(long, help="Enable verbose output")]
   pub verbose: bool,
-  #[clap(help="Processes to manage")]
+  #[clap(help="Processes to manage", required=true)]
   pub specs: Vec<String>,
 }
 
@@ -43,9 +43,5 @@ async fn cmd() -> Result<(), error::Error> {
     procs.push(proc);
   }
   
-  runner::Pod::new(procs).exec().await?;
-  
-  // waiter::wait(&checks, time::Duration::from_secs(10)).await?;
-  
-  Ok(())
+  Ok(runner::Pod::new(procs).exec().await?)
 }
