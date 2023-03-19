@@ -4,6 +4,7 @@ use std::process;
 use tokio;
 use clap::Parser;
 use serde::{Serialize, Deserialize};
+use colored::Colorize;
 
 mod waiter;
 mod runner;
@@ -27,7 +28,7 @@ async fn main() {
   match cmd().await {
     Ok(code)  => process::exit(code),
     Err(err)  => {
-      eprintln!("* * * {}", err);
+      eprintln!("{}", &format!("* * * {}", err).yellow().bold());
       process::exit(1);
     },
   };

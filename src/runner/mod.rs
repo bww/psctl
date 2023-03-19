@@ -13,6 +13,7 @@ use futures::stream;
 use futures::future::FutureExt;
 use futures::stream::TryStreamExt;
 use serde::{Serialize, Deserialize};
+use colored::Colorize;
 
 use crate::waiter;
 
@@ -36,11 +37,11 @@ impl Pod {
       tset.push((spec, spec.task()?));
     }
     
-    println!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", "));
+    println!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
     let mut pset: Vec<process::Child> = Vec::new();
     for (spec, task) in &mut tset {
       let proc = task.spawn()?;
-      println!("----> {}", spec);
+      println!("{}", &format!("----> {}", spec).bold());
       let checks = spec.checks();
       if checks.len() > 0 {
         waiter::wait(checks, time::Duration::from_secs(10)).await?;
@@ -62,7 +63,7 @@ impl Pod {
       None => 0,
     };
     
-    println!("====> finished");
+    println!("{}", "====> finished".bold());
     Ok(code)
   }
 }
