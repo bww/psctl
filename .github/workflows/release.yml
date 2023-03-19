@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:     # Sequence of patterns matched against refs/tags
+      - 'v*'  # Push events to matching v*, i.e. v1.0, v20.15.10
+
+jobs:
+  build:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+          override: true
+      - name: Build
+        run: cargo build --release --all-features
+      - name: Prepare release
+        run: |
+          package=psctl-${{ github.ref_name }}-linux-x86_64
+          mkdir -p $package/bin && cp target/release/psctl $package/bin/psctl
+          mkdir -p $package/etc && cp -r etc/static/template $package/etc/template
+      - name: Package release
+        run: tar -zcvf psctl-${{ github.ref_name }}-linux-x86_64.tgz psctl-${{ github.ref_name }}-linux-x86_64
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          draft: true
+          prerelease: false
+      - name: Upload artifact
+        id: upload_artifact_linux_amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: psctl-${{ github.ref_name }}-linux-x86_64.tgz
+          asset_name: psctl-${{ github.ref_name }}-linux-x86_64.tgz
+          asset_content_type: application/x-tgz
