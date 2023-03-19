@@ -33,14 +33,8 @@ async fn cmd() -> Result<(), error::Error> {
   let opts = Options::parse();
   
   let mut procs = Vec::new();
-  let mut checks: Vec<String> = Vec::new();
   for e in &opts.specs {
-    let proc = runner::Process::parse(e)?;
-    match &proc.check() {
-      Some(url) => checks.push(url.to_string()),
-      None => {},
-    };
-    procs.push(proc);
+    procs.push(runner::Process::parse(e)?);
   }
   
   Ok(runner::Pod::new(procs).exec().await?)

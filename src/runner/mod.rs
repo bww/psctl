@@ -40,9 +40,10 @@ impl Pod {
     for (spec, task) in &mut tset {
       let proc = task.spawn()?;
       println!("----> {}", spec);
-      if let Some(check) = spec.check() {
+      let checks = spec.checks();
+      if checks.len() > 0 {
         // println!("----> {}: {}", spec.key(), check);
-        waiter::wait(&vec![check.to_string()], time::Duration::from_secs(10)).await?;
+        waiter::wait(checks, time::Duration::from_secs(10)).await?;
         // println!("----> {}", check);
       }
       pset.push(proc);
@@ -66,7 +67,7 @@ pub struct Process {
   command: String,
   label: Option<String>,
   deps: Vec<String>,
-  check: Option<String>,
+  checks: Vec<String>,
 }
 
 impl Process {
@@ -78,9 +79,9 @@ impl Process {
         None => None,
       },
       deps: deps.iter().map(|e| e.to_string()).collect(),
-      check: match url {
-        Some(url) => Some(url.to_owned()),
-        None => None,
+      checks: match url {
+        Some(url) => vec![url.to_owned()],
+        None => vec![],
       },
     }
   }
@@ -138,11 +139,8 @@ impl Process {
     &self.command
   }
   
-  pub fn check<'a>(&'a self) -> Option<&'a str> {
-    match &self.check {
-      Some(url) => Some(url),
-      None => None,
-    }
+  pub fn checks<'a>(&'a self) -> &'a Vec<String> {
+    &self.checks
   }
   
   pub async fn _exec(&self) -> Result<()> {
@@ -170,14 +168,12 @@ impl Process {
 impl fmt::Display for Process {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let mut d = String::new();
-    match self.label() {
-      Some(l) => d.push_str(&format!("{}: ", l)),
-      None    => {},
+    if let Some(l) = self.label() {
+      d.push_str(&format!("{}: ", l));
     }
     d.push_str(self.command());
-    match self.check() {
-      Some(u) => d.push_str(&format!(" ({})", u)),
-      None    => {},
+    if self.checks.len() > 0 {
+      d.push_str(&format!(" ({})", self.checks.join("; ")));
     }
     write!(f, "{}", &d)
   }
