@@ -4,8 +4,8 @@ tasks:
     name: a
     run: sleep 3 && echo "A"
     checks:
-      - http://localhost:4000/delay?for=2s
-      - http://localhost:4000/delay?for=3s
+      - https://hub.dummyapis.com/delay?seconds=2
+      - https://hub.dummyapis.com/delay?seconds=3
     deps:
       - b
       - c
@@ -14,12 +14,12 @@ tasks:
     name: b
     run: sleep 10 && echo "B"
     checks:
-      - http://localhost:4000/delay?for=2s
+      - https://hub.dummyapis.com/delay?seconds=2
 
   -
     name: c
     run: sleep 10 && echo "C"
     checks:
-      - http://localhost:4000/delay?for=2s
+      - https://hub.dummyapis.com/delay?seconds=2
     deps:
       - b
