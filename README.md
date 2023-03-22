@@ -1,7 +1,7 @@
 # Process Control
 This is a simple process management tool. It runs processes as an interdependent graph.
 
-You can think of it as being like [Docker Compose](https://docs.docker.com/compose/) but for commands instead of containers. Or like [Foreman](https://ddollar.github.io/foreman/) with support for dependencies and availability checks.
+You can think of Process Control as being like [Docker Compose](https://docs.docker.com/compose/) but for commands instead of containers. Or like [Foreman](https://ddollar.github.io/foreman/) but with support for process dependencies and availability checks.
 
 <hr>
 
