@@ -17,9 +17,20 @@ pub struct Options {
   pub debug: bool,
   #[clap(long, help="Enable verbose output")]
   pub verbose: bool,
-  #[clap(long, help="Use task specification config")]
-  pub config: Option<String>,
-  #[clap(help="Processes to manage")]
+  #[clap(long, help="Load process specifiers from a taskfile")]
+  pub file: Option<String>,
+  #[clap(help="Process specifiers to manage. When a taskfile is provided, it is preferred:
+
+specs   := <spec1> [... <specN>]
+spec    := <label> [<deps>]: <command>[=<check>]
+labels  := <label> | <label>, <labels>
+label   := /[a-zA-Z0-9]+/
+deps    := + <labels>
+command := /[^=]+/
+check   := any file:// or http(s):// url
+
+$ psctl 'a: echo A' 'b: echo B=file:///tmp/file' 'c +a,b: echo C'
+")]
   pub specs: Vec<String>,
 }
 
@@ -37,7 +48,7 @@ async fn main() {
 async fn cmd() -> Result<i32, error::Error> {
   let opts = Options::parse();
   
-  let procs = if let Some(file) = &opts.config {
+  let procs = if let Some(file) = &opts.file {
     read_procs(file)?.tasks
   }else{
     let mut procs = Vec::new();
