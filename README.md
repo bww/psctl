@@ -44,7 +44,7 @@ tasks:
 It can be run as follows:
 
 ```
-$ psctl --config test/example.yaml
+$ psctl --file test/example.yaml
 ====> b, c, a
 ----> b: sleep 10 && echo "B" (https://hub.dummyapis.com/delay?seconds=2)
 ----> c: sleep 10 && echo "C" (https://hub.dummyapis.com/delay?seconds=2)
