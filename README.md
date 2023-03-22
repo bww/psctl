@@ -1,5 +1,9 @@
 # Process Control
-This is a simple orchestration tool. It runs processes as an interdependent graph.
+This is a simple process management tool. It runs processes as an interdependent graph.
+
+You can think of it as being like [Docker Compose](https://docs.docker.com/compose/) but for commands instead of containers. Or like [Foreman](https://ddollar.github.io/foreman/) with support for dependencies and availability checks.
+
+<hr>
 
 Processes can have **availability checks** associated with them, which are used to determine when it has finished starting up and has become available. Processes can also describe which other processes are their **dependencies**. Using all this information, Process Control will:
 
