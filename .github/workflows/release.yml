@@ -40,7 +40,7 @@ jobs:
           profile: minimal
           override: true
       - name: Build
-        run: cargo build --release --all-features
+        run: cargo build --release --all-features --target ${{ matrix.target }}
       - name: Package release
         run: tar -zcvf psctl-${{ github.ref_name }}-${{ matrix.target }}.tgz target/release/psctl
       - name: Upload artifact
