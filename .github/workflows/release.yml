@@ -51,7 +51,7 @@ jobs:
         target: [ x86_64-unknown-linux-gnu, x86_64-apple-darwin ]
     steps:
       - name: Upload artifact
-        id: upload_artifact_${{ matrix.target }}
+        # id: upload_artifact_${{ matrix.target }}
         uses: actions/upload-release-asset@v1
         env: # GITHUB_TOKEN must be given write permission in Repo > Settings > Actions
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
