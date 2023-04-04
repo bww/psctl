@@ -6,8 +6,26 @@ on:
       - 'v*'  # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
-  build:
+  release:
     name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          draft: true
+          prerelease: false
+
+  artifacts:
+    needs: [ release ]
+    name: Build Artifacts
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -25,35 +43,7 @@ jobs:
         run: cargo build --release --all-features
       - name: Package release
         run: tar -zcvf psctl-${{ github.ref_name }}-${{ matrix.target }}.tgz target/release/psctl
-
-  release:
-    needs: [ build ]
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      artifact_upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - name: Create release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: true
-          prerelease: false
-
-  package:
-    needs: [ release ]
-    name: Package Release
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [ x86_64-unknown-linux-gnu, x86_64-apple-darwin ]
-    steps:
       - name: Upload artifact
-        # id: upload_artifact_${{ matrix.target }}
         uses: actions/upload-release-asset@v1
         env: # GITHUB_TOKEN must be given write permission in Repo > Settings > Actions
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
