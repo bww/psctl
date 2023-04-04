@@ -16,3 +16,7 @@ url = { version = "2.3.1" }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 colored = "2.0.0"
+
+[target.x86_64-apple-darwin]
+linker = "x86_64-apple-darwin14-clang"
+ar = "x86_64-apple-darwin14-ar"
