@@ -9,7 +9,7 @@ jobs:
   build:
     name: Create Release
     runs-on: ubuntu-latest
-    strategy: 
+    strategy:
       matrix:
         target: [ x86_64-unknown-linux-gnu, x86_64-apple-darwin ]
     steps:
@@ -46,7 +46,7 @@ jobs:
     needs: [ release ]
     name: Package Release
     runs-on: ubuntu-latest
-    strategy: 
+    strategy:
       matrix:
         target: [ x86_64-unknown-linux-gnu, x86_64-apple-darwin ]
     steps:
