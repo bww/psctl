@@ -5,6 +5,16 @@ You can think of Process Control as being like [Docker Compose](https://docs.doc
 
 <hr>
 
+Install Process Control by downloading binaries a release:
+https://github.com/bww/psctl/releases
+
+Or via Homebrew on macOS:
+```
+$ brew install bww/stable/psctl
+```
+
+<hr>
+
 Processes can have **availability checks** associated with them, which are used to determine when it has finished starting up and has become available. Processes can also describe which other processes are their **dependencies**. Using all this information, Process Control will:
 
 1. Determine the order processes should be run,
