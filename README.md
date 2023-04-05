@@ -1,7 +1,7 @@
 # Process Control
 This is a simple process management tool. It runs processes as an interdependent graph.
 
-You can think of Process Control as being like [Docker Compose](https://docs.docker.com/compose/) but for commands instead of containers. Or like [Foreman](https://ddollar.github.io/foreman/) but with support for process dependencies and availability checks.
+You can think of _Process Control_ as being like [Docker Compose](https://docs.docker.com/compose/) but for commands instead of containers. Or like [Foreman](https://ddollar.github.io/foreman/) but with support for process dependencies and availability checks.
 
 ## Installing
 
@@ -13,14 +13,14 @@ $ brew install bww/stable/psctl
 
 ## How to use this thing
 
-Processes can have **availability checks** associated with them, which are used to determine when it has finished starting up and has become available. Processes can also describe which other processes are their **dependencies**. Using all this information, Process Control will:
+Processes can have **availability checks** associated with them, which are used to determine when it has finished starting up and has become available. Processes can also describe which other processes are their **dependencies**. Using all this information, _Process Control_ will:
 
 1. Determine the order processes should be run,
 2. Execute each process in this order, in turn,
 3. Wait for each process to become available, if availability checks are provided, and then
 4. Wait forever for any process to exit.
 
-Once any process exits, Process Control kills the other running processes and exits with the same exit code as the first exiting process.
+Once any process exits, _Process Control_ kills the other running processes and exits with the same exit code as the first exiting process.
 
 The following process configuration file is illustrative:
 
