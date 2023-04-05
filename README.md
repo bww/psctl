@@ -11,7 +11,7 @@ Install _Process Control_ by [downloading a release binary](https://github.com/b
 $ brew install bww/stable/psctl
 ```
 
-If you have a Rust toolchain installed, you can also install from [Crates.io](https://crates.io/crates/psctl):
+If you have a Rust toolchain installed, you can also install from [crates.io](https://crates.io/crates/psctl):
 
 ```
 $ cargo install psctl
