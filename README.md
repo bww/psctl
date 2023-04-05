@@ -3,17 +3,15 @@ This is a simple process management tool. It runs processes as an interdependent
 
 You can think of Process Control as being like [Docker Compose](https://docs.docker.com/compose/) but for commands instead of containers. Or like [Foreman](https://ddollar.github.io/foreman/) but with support for process dependencies and availability checks.
 
-<hr>
+## Installing
 
-Install Process Control by downloading binaries a release:
-https://github.com/bww/psctl/releases
+Install _Process Control_ by [downloading a release binary](https://github.com/bww/psctl/releases), or by using [Homebrew](https://brew.sh/) on macOS:
 
-Or via Homebrew on macOS:
 ```
 $ brew install bww/stable/psctl
 ```
 
-<hr>
+## How to use this thing
 
 Processes can have **availability checks** associated with them, which are used to determine when it has finished starting up and has become available. Processes can also describe which other processes are their **dependencies**. Using all this information, Process Control will:
 
