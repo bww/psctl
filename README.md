@@ -11,6 +11,12 @@ Install _Process Control_ by [downloading a release binary](https://github.com/b
 $ brew install bww/stable/psctl
 ```
 
+If you have a Rust toolchain installed, you can also install from [Crates.io](https://crates.io/crates/psctl):
+
+```
+$ cargo install psctl
+```
+
 ## How to use this thing
 
 Processes can have **availability checks** associated with them, which are used to determine when it has finished starting up and has become available. Processes can also describe which other processes are their **dependencies**. Using all this information, _Process Control_ will:
