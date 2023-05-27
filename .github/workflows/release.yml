@@ -49,7 +49,7 @@ jobs:
       - name: Package release
         run: |
           mkdir -p target/${{ matrix.target }}/bin && cp target/${{ matrix.target }}/release/psctl target/${{ matrix.target }}/bin/psctl
-          (cd target/${{ matrix.target }} && tar -zcvf psctl-${{ github.ref_name }}-${{ matrix.target }}.tgz target/${{ matrix.target }}/release/psctl)
+          (cd target/${{ matrix.target }} && tar -zcvf psctl-${{ github.ref_name }}-${{ matrix.target }}.tgz bin/psctl)
       - name: Upload artifact
         uses: actions/upload-release-asset@v1
         env: # GITHUB_TOKEN must be given write permission in Repo > Settings > Actions
