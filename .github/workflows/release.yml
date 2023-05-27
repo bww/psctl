@@ -48,7 +48,7 @@ jobs:
         run: cargo build --release --all-features --target ${{ matrix.target }}
       - name: Package release
         run: |
-          mkdir -p target/${{ matrix.target }}/bin && cp target/${{ matrix.target }}/release/psctl target/psctl-${{ github.sha }}/bin/psctl
+          mkdir -p target/psctl-${{ github.sha }}/bin && cp target/${{ matrix.target }}/release/psctl target/psctl-${{ github.sha }}/bin/psctl
           tar -zcvf psctl-${{ github.ref_name }}-${{ matrix.target }}.tgz --strip-components 1 target/psctl-${{ github.sha }}/bin/psctl
       - name: Upload artifact
         uses: actions/upload-release-asset@v1
