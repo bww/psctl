@@ -2,6 +2,7 @@ pub mod error;
 
 use core::time;
 
+use std::io;
 use std::fmt;
 use std::result;
 use std::pin::Pin;
@@ -49,19 +50,32 @@ impl Pod {
       pset.push(proc);
     }
     
-    let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<i32>>>>> = Vec::new();
-    for proc in &mut pset {
-      jobs.push(Box::pin(proc.wait().map(|f| match f?.code() {
-        Some(code) => Ok(code),
-        None => Ok(0),
-      })));
-    }
-    
-    let mut jobs = stream::FuturesUnordered::from_iter(jobs);
-    let code = match jobs.try_next().await? {
-      Some(code) => code,
-      None => 0,
+    let code = {
+      let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<i32>>>>> = Vec::new();
+      for proc in &mut pset {
+        jobs.push(Box::pin(proc.wait().map(|f| match f?.code() {
+          Some(code) => Ok(code),
+          None => Ok(0),
+        })));
+      }
+      
+      let mut jobs = stream::FuturesUnordered::from_iter(jobs);
+      match jobs.try_next().await? {
+        Some(code) => code,
+        None => 0,
+      }
     };
+    
+    // explicitly clean up after remaining processes
+    for proc in &mut pset {
+      match proc.kill().await {
+        Ok(_) => {},
+        Err(err) => match err.kind() {
+          io::ErrorKind::InvalidInput => {},
+          _ => return Err(error::Error::IOError(err)),
+        },
+      };
+    }
     
     println!("{}", "====> finished".bold());
     Ok(code)
@@ -170,7 +184,6 @@ impl Process {
   fn task(&self) -> Result<process::Command> {
     let mut cmd = process::Command::new("sh");
     cmd.arg("-c").arg(self.command());
-    cmd.kill_on_drop(true);
     Ok(cmd)
   }
 }
