@@ -39,7 +39,7 @@ impl Pod {
     }
     
     println!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
-    let mut pset: Vec<process::Child> = Vec::new();
+    let mut pset: Vec<(&Process, process::Child)> = Vec::new();
     for (spec, task) in &mut tset {
       let proc = task.spawn()?;
       println!("{}", &format!("----> {}", spec).bold());
@@ -47,12 +47,12 @@ impl Pod {
       if checks.len() > 0 {
         waiter::wait(checks, time::Duration::from_secs(10)).await?;
       }
-      pset.push(proc);
+      pset.push((spec, proc));
     }
     
     let code = {
       let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<i32>>>>> = Vec::new();
-      for proc in &mut pset {
+      for (_, proc) in &mut pset {
         jobs.push(Box::pin(proc.wait().map(|f| match f?.code() {
           Some(code) => Ok(code),
           None => Ok(0),
@@ -67,11 +67,15 @@ impl Pod {
     };
     
     // explicitly clean up after remaining processes
-    for proc in &mut pset {
+    for (spec, proc) in &mut pset {
       match proc.kill().await {
-        Ok(_) => {},
+        Ok(_) => { // killed, reaped
+          println!("{}", &format!("~~~~> {} (killed)", spec).bold());
+        },
         Err(err) => match err.kind() {
-          io::ErrorKind::InvalidInput => {},
+          io::ErrorKind::InvalidInput => {
+            println!("{}", &format!("~~~~> {} (ended)", spec).bold());
+          },
           _ => return Err(error::Error::IOError(err)),
         },
       };
