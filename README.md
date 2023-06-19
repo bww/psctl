@@ -3,6 +3,8 @@ This is a simple process management tool. It runs processes as an interdependent
 
 You can think of _Process Control_ as being like [Docker Compose](https://docs.docker.com/compose/) but for commands instead of containers. Or like [Foreman](https://ddollar.github.io/foreman/) but with support for process dependencies and availability checks.
 
+(Process Control only works on Unix/Linux systems. It is tested on Linux and macOS.)
+
 ## Installing
 
 Install _Process Control_ by [downloading a release binary](https://github.com/bww/psctl/releases), or by using [Homebrew](https://brew.sh/) on macOS:
