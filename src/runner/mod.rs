@@ -8,13 +8,18 @@ use std::result;
 use std::pin::Pin;
 use std::collections::HashSet;
 use std::collections::HashMap;
+use std::os::unix::process::CommandExt;
 
 use tokio::process;
 use futures::stream;
-use futures::future::FutureExt;
 use futures::stream::TryStreamExt;
+use futures::future::FutureExt;
 use serde::{Serialize, Deserialize};
 use colored::Colorize;
+
+use nix::unistd::Pid;
+use nix::sys::signal;
+use nix::sys::signal::Signal;
 
 use crate::waiter;
 
@@ -41,7 +46,10 @@ impl Pod {
     println!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
     let mut pset: Vec<(&Process, process::Child)> = Vec::new();
     for (spec, task) in &mut tset {
-      let proc = task.spawn()?;
+      let proc = match task.spawn() {
+        Ok(proc) => proc,
+        Err(err) => return Err(error::ExecError::new(&format!("Could not run process: {}; because: {}", spec, err)).into()),
+      };
       println!("{}", &format!("----> {}", spec).bold());
       let checks = spec.checks();
       if checks.len() > 0 {
@@ -68,17 +76,23 @@ impl Pod {
     
     // explicitly clean up after remaining processes
     for (spec, proc) in &mut pset {
-      match proc.kill().await {
-        Ok(_) => { // killed, reaped
-          println!("{}", &format!("~~~~> {} (killed)", spec).bold());
-        },
-        Err(err) => match err.kind() {
-          io::ErrorKind::InvalidInput => {
-            println!("{}", &format!("~~~~> {} (ended)", spec).bold());
+      if let Some(pid) = proc.id() { // negative-pid addresses the process group
+        if let Err(err) = signal::kill(Pid::from_raw(-(pid as i32)), Signal::SIGTERM) {
+          println!("{}", &format!("~~~~> {} [failed] {}", spec, err).bold());
+          continue; // could not kill this one; move on
+        }
+        match proc.wait().await {
+          Ok(_) => {
+            println!("{}", &format!("~~~~> {} [{} killed]", spec, pid).bold());
           },
-          _ => return Err(error::Error::IOError(err)),
-        },
-      };
+          Err(err) => match err.kind() {
+            io::ErrorKind::InvalidInput => {
+              println!("{}", &format!("~~~~> {} [{} ended]", spec, pid).bold());
+            },
+            _ => return Err(error::Error::IOError(err)),
+          },
+        };
+      }
     }
     
     println!("{}", "====> finished".bold());
@@ -186,9 +200,10 @@ impl Process {
   }
   
   fn task(&self) -> Result<process::Command> {
-    let mut cmd = process::Command::new("sh");
+    let mut cmd = std::process::Command::new("sh");
+    cmd.process_group(0); // use a process group to clean up children; providing '0' uses this process' id for the group
     cmd.arg("-c").arg(self.command());
-    Ok(cmd)
+    Ok(cmd.into())
   }
 }
 
