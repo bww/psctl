@@ -46,18 +46,11 @@ impl Pod {
     }
 
     // run processes
-    let res = match self._exec(&ord, &mut tset, &mut pset, rx).await {
-      Ok(code) => code,
-      Err(err) => {
-        eprintln!("Error: {}", err);
-        255
-      },
-    };
-
+    let res = self._exec(&ord, &mut tset, &mut pset, rx).await;
     // explicitly clean up after processes
     Self::cleanup(&mut pset).await?;
-
-    Ok(res)
+    // return the result
+    res
   }
 
   pub async fn _exec<'a>(&self, ord: &Vec<&Process>, tset: &mut Vec<(&'a Process, process::Command)>, pset: &mut Vec<(&'a Process, process::Child)>, rx: &mut mpsc::Receiver<()>) -> Result<i32> {
