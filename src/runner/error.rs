@@ -41,6 +41,7 @@ pub enum Error {
   WaiterError(waiter::error::Error),
   ExecError(ExecError),
   DependencyError(DependencyError),
+  CanceledError,
 }
 
 impl From<io::Error> for Error {
@@ -74,6 +75,7 @@ impl fmt::Display for Error {
       Self::WaiterError(err) => err.fmt(f),
       Self::ExecError(err) => err.fmt(f),
       Self::DependencyError(err) => err.fmt(f),
+      Self::CanceledError => write!(f, "Canceled"),
     }
   }
 }

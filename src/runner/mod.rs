@@ -9,9 +9,9 @@ use std::pin::Pin;
 use std::collections::HashSet;
 use std::collections::HashMap;
 use std::os::unix::process::CommandExt;
-use std::sync::mpsc;
 
 use tokio::process;
+use tokio::sync::mpsc;
 use futures::stream;
 use futures::stream::TryStreamExt;
 use futures::future::FutureExt;
@@ -37,7 +37,7 @@ impl Pod {
     }
   }
 
-  pub async fn exec(&self, rx: mpsc::Receiver<()>) -> Result<i32> {
+  pub async fn exec(&self, rx: &mut mpsc::Receiver<()>) -> Result<i32> {
     let ord: Vec<&Process> = order_procs(self.procs.iter().map(|e| e).collect())?;
     let mut tset: Vec<(&Process, process::Command)> = Vec::new();
     let mut pset: Vec<(&Process, process::Child)> = Vec::new();
@@ -45,14 +45,22 @@ impl Pod {
       tset.push((spec, spec.task()?));
     }
 
-    let res = self._exec(&ord, &mut tset, &mut pset).await?;
-    // explicitly clean up after remaining processes
+    // run processes
+    let res = match self._exec(&ord, &mut tset, &mut pset, rx).await {
+      Ok(code) => code,
+      Err(err) => {
+        eprintln!("Error: {}", err);
+        255
+      },
+    };
+
+    // explicitly clean up after processes
     Self::cleanup(&mut pset).await?;
 
     Ok(res)
   }
 
-  pub async fn _exec<'a>(&self, ord: &Vec<&Process>, tset: &mut Vec<(&'a Process, process::Command)>, pset: &mut Vec<(&'a Process, process::Child)>) -> Result<i32> {
+  pub async fn _exec<'a>(&self, ord: &Vec<&Process>, tset: &mut Vec<(&'a Process, process::Command)>, pset: &mut Vec<(&'a Process, process::Child)>, rx: &mut mpsc::Receiver<()>) -> Result<i32> {
     eprintln!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
     for (spec, task) in tset {
       let proc = match task.spawn() {
@@ -63,10 +71,13 @@ impl Pod {
       pset.push((spec, proc));
       let checks = spec.checks();
       if checks.len() > 0 {
-        match waiter::wait(checks, time::Duration::from_secs(10)).await {
-          Ok(_)    => eprintln!("{}", &format!("----> {}: available", spec.key()).bold()),
-          Err(err) => return Err(err.into()),
-        }
+        tokio::select! {
+          _ = rx.recv() =>  return Err(error::Error::CanceledError),
+          res = waiter::wait(checks, time::Duration::from_secs(10)) =>  match res {
+            Ok(_)    => eprintln!("{}", &format!("----> {}: available", spec.key()).bold()),
+            Err(err) => return Err(err.into()),
+          }
+        };
       }
     }
 
@@ -80,9 +91,12 @@ impl Pod {
       }
 
       let mut jobs = stream::FuturesUnordered::from_iter(jobs);
-      match jobs.try_next().await? {
-        Some(code) => code,
-        None => 0,
+      tokio::select! {
+        _ = rx.recv() =>  return Err(error::Error::CanceledError),
+        res = jobs.try_next() => match res? {
+          Some(code) => code,
+          None => 0,
+        }
       }
     };
 

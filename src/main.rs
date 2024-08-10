@@ -1,8 +1,9 @@
 use std::fs;
 use std::process;
-use std::sync::mpsc;
 
 use tokio;
+use tokio::sync::mpsc;
+use futures::executor;
 use clap::Parser;
 use serde::{Serialize, Deserialize};
 use colored::Colorize;
@@ -49,10 +50,13 @@ async fn main() {
 
 async fn cmd() -> Result<i32, error::Error> {
   let opts = Options::parse();
-  let (tx, rx) = mpsc::channel();
+  let (tx, mut rx) = mpsc::channel(1);
 
-  ctrlc::set_handler(move || tx.send(()).expect("Failed to propagate signal"))
-    .expect("Failed to set Ctrl-C handler");
+  ctrlc::set_handler(move || {
+    executor::block_on(async {
+      tx.send(()).await
+    }).expect("Failed to propagate signal")
+  }).expect("Failed to set Ctrl-C handler");
 
   let procs = if let Some(file) = &opts.file {
     read_procs(file)?.tasks
@@ -67,7 +71,7 @@ async fn cmd() -> Result<i32, error::Error> {
   if procs.len() < 1 {
     Ok(0) // nothing to do
   }else{
-    Ok(runner::Pod::new(procs).exec(rx).await?)
+    Ok(runner::Pod::new(procs).exec(&mut rx).await?)
   }
 }
 
