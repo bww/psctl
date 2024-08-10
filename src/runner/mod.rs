@@ -45,10 +45,14 @@ impl Pod {
       tset.push((spec, spec.task()?));
     }
 
-    self._exec(&ord, &mut tset, &mut pset).await
+    let res = self._exec(&ord, &mut tset, &mut pset).await?;
+    // explicitly clean up after remaining processes
+    Self::cleanup(&mut pset).await?;
+
+    Ok(res)
   }
 
-  pub async fn _exec(&self, ord: &Vec<&Process>, tset: &mut Vec<(&Process, process::Command)>, pset: &mut Vec<(&Process, process::Child)>) -> Result<i32> {
+  pub async fn _exec<'a>(&self, ord: &Vec<&Process>, tset: &mut Vec<(&'a Process, process::Command)>, pset: &mut Vec<(&'a Process, process::Child)>) -> Result<i32> {
     eprintln!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
     for (spec, task) in tset {
       let proc = match task.spawn() {
@@ -56,15 +60,12 @@ impl Pod {
         Err(err) => return Err(error::ExecError::new(&format!("Could not run process: {}; because: {}", spec, err)).into()),
       };
       eprintln!("{}", &format!("----> {}", spec).bold());
-      pset.push((spec, proc)); // add it to the set before we process it, so it's cleaned up should it fail
+      pset.push((spec, proc));
       let checks = spec.checks();
       if checks.len() > 0 {
         match waiter::wait(checks, time::Duration::from_secs(10)).await {
           Ok(_)    => eprintln!("{}", &format!("----> {}: available", spec.key()).bold()),
-          Err(err) => {
-            Self::cleanup(&mut pset).await?; // explicitly clean up after remaining processes on failure
-            return Err(err.into());
-          },
+          Err(err) => return Err(err.into()),
         }
       }
     }
@@ -84,9 +85,6 @@ impl Pod {
         None => 0,
       }
     };
-
-    // explicitly clean up after remaining processes
-    Self::cleanup(pset).await?;
 
     eprintln!("{}", "====> finished".bold());
     Ok(code)
