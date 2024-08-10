@@ -9,6 +9,7 @@ use std::pin::Pin;
 use std::collections::HashSet;
 use std::collections::HashMap;
 use std::os::unix::process::CommandExt;
+use std::sync::mpsc;
 
 use tokio::process;
 use futures::stream;
@@ -36,16 +37,20 @@ impl Pod {
     }
   }
 
-  pub async fn exec(&self) -> Result<i32> {
+  pub async fn exec(&self, rx: mpsc::Receiver<()>) -> Result<i32> {
     let ord: Vec<&Process> = order_procs(self.procs.iter().map(|e| e).collect())?;
     let mut tset: Vec<(&Process, process::Command)> = Vec::new();
+    let mut pset: Vec<(&Process, process::Child)> = Vec::new();
     for spec in &ord {
       tset.push((spec, spec.task()?));
     }
 
+    self._exec(&ord, &mut tset, &mut pset).await
+  }
+
+  pub async fn _exec(&self, ord: &Vec<&Process>, tset: &mut Vec<(&Process, process::Command)>, pset: &mut Vec<(&Process, process::Child)>) -> Result<i32> {
     eprintln!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
-    let mut pset: Vec<(&Process, process::Child)> = Vec::new();
-    for (spec, task) in &mut tset {
+    for (spec, task) in tset {
       let proc = match task.spawn() {
         Ok(proc) => proc,
         Err(err) => return Err(error::ExecError::new(&format!("Could not run process: {}; because: {}", spec, err)).into()),
@@ -66,7 +71,7 @@ impl Pod {
 
     let code = {
       let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<i32>>>>> = Vec::new();
-      for (_, proc) in &mut pset {
+      for (_, proc) in pset {
         jobs.push(Box::pin(proc.wait().map(|f| match f?.code() {
           Some(code) => Ok(code),
           None => Ok(0),
@@ -81,7 +86,7 @@ impl Pod {
     };
 
     // explicitly clean up after remaining processes
-    Self::cleanup(&mut pset).await?;
+    Self::cleanup(pset).await?;
 
     eprintln!("{}", "====> finished".bold());
     Ok(code)
