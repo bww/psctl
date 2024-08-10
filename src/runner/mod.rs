@@ -35,29 +35,35 @@ impl Pod {
       procs: procs,
     }
   }
-  
+
   pub async fn exec(&self) -> Result<i32> {
     let ord: Vec<&Process> = order_procs(self.procs.iter().map(|e| e).collect())?;
     let mut tset: Vec<(&Process, process::Command)> = Vec::new();
     for spec in &ord {
       tset.push((spec, spec.task()?));
     }
-    
-    println!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
+
+    eprintln!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
     let mut pset: Vec<(&Process, process::Child)> = Vec::new();
     for (spec, task) in &mut tset {
       let proc = match task.spawn() {
         Ok(proc) => proc,
         Err(err) => return Err(error::ExecError::new(&format!("Could not run process: {}; because: {}", spec, err)).into()),
       };
-      println!("{}", &format!("----> {}", spec).bold());
+      eprintln!("{}", &format!("----> {}", spec).bold());
+      pset.push((spec, proc)); // add it to the set before we process it, so it's cleaned up should it fail
       let checks = spec.checks();
       if checks.len() > 0 {
-        waiter::wait(checks, time::Duration::from_secs(10)).await?;
+        match waiter::wait(checks, time::Duration::from_secs(10)).await {
+          Ok(_)    => eprintln!("{}", &format!("----> {}: available", spec.key()).bold()),
+          Err(err) => {
+            Self::cleanup(&mut pset).await?; // explicitly clean up after remaining processes on failure
+            return Err(err.into());
+          },
+        }
       }
-      pset.push((spec, proc));
     }
-    
+
     let code = {
       let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<i32>>>>> = Vec::new();
       for (_, proc) in &mut pset {
@@ -66,37 +72,43 @@ impl Pod {
           None => Ok(0),
         })));
       }
-      
+
       let mut jobs = stream::FuturesUnordered::from_iter(jobs);
       match jobs.try_next().await? {
         Some(code) => code,
         None => 0,
       }
     };
-    
+
     // explicitly clean up after remaining processes
-    for (spec, proc) in &mut pset {
+    Self::cleanup(&mut pset).await?;
+
+    eprintln!("{}", "====> finished".bold());
+    Ok(code)
+  }
+
+  async fn cleanup(pset: &mut Vec<(&Process, process::Child)>) -> Result<()> {
+    // explicitly clean up after remaining processes
+    for (spec, proc) in pset {
       if let Some(pid) = proc.id() { // negative-pid addresses the process group
         if let Err(err) = signal::kill(Pid::from_raw(-(pid as i32)), Signal::SIGTERM) {
-          println!("{}", &format!("~~~~> {} [failed] {}", spec, err).bold());
+          eprintln!("{}", &format!("~~~~> {} [failed] {}", spec, err).bold());
           continue; // could not kill this one; move on
         }
         match proc.wait().await {
           Ok(_) => {
-            println!("{}", &format!("~~~~> {} [{} killed]", spec, pid).bold());
+            eprintln!("{}", &format!("~~~~> {} [{} killed]", spec, pid).bold());
           },
           Err(err) => match err.kind() {
             io::ErrorKind::InvalidInput => {
-              println!("{}", &format!("~~~~> {} [{} ended]", spec, pid).bold());
+              eprintln!("{}", &format!("~~~~> {} [{} ended]", spec, pid).bold());
             },
             _ => return Err(error::Error::IOError(err)),
           },
         };
       }
     }
-    
-    println!("{}", "====> finished".bold());
-    Ok(code)
+    Ok(())
   }
 }
 
@@ -127,7 +139,7 @@ impl Process {
       },
     }
   }
-  
+
   // <label> [+ <dep1> [, ...]]: <command>=<check url>
   pub fn parse(text: &str) -> Result<Process> {
     let split: Vec<&str> = text.splitn(2, ":").collect();
@@ -136,7 +148,7 @@ impl Process {
       1 => (None, text),
       _ => return Err(error::ExecError::new(&format!("Invalid process format: {}", text)).into()),
     };
-    
+
     let (label, deps) = match label {
       Some(label) => {
         let split: Vec<&str> = label.splitn(2, "+").collect();
@@ -148,57 +160,57 @@ impl Process {
       },
       None => (label, Vec::new()),
     };
-    
+
     let split: Vec<&str> = text.splitn(2, "=").collect();
     let (cmd, check) = match split.len() {
       2 => (split[0].trim(), Some(split[1].trim())),
       1 => (split[0], None),
       _ => return Err(error::ExecError::new(&format!("Invalid process format: {}", text)).into()),
     };
-    
+
     Ok(Self::new(label, cmd, deps, check))
   }
-  
+
   fn key<'a>(&'a self) -> &'a str {
     match self.label() {
       Some(label) => label,
       None => self.command(),
     }
   }
-  
+
   pub fn label<'a>(&'a self) -> Option<&'a str> {
     match &self.label {
       Some(label) => Some(label),
       None => None,
     }
   }
-  
+
   pub fn deps<'a>(&'a self) -> &'a Vec<String> {
     &self.deps
   }
-  
+
   pub fn command<'a>(&'a self) -> &'a str {
     &self.command
   }
-  
+
   pub fn checks<'a>(&'a self) -> &'a Vec<String> {
     &self.checks
   }
-  
+
   pub async fn _exec(&self) -> Result<()> {
     match self._proc()?.wait().await {
       Ok(_stat) => Ok(()),
       Err(err)  => Err(error::ExecError::new(&format!("Could not exec process: {}", err)).into()),
     }
   }
-  
+
   fn _proc(&self) -> Result<process::Child> {
     match self.task()?.spawn() {
       Ok(proc) => Ok(proc),
       Err(err) => return Err(error::ExecError::new(&format!("Could not spawn process: {}", err)).into()),
     }
   }
-  
+
   fn task(&self) -> Result<process::Command> {
     let mut cmd = std::process::Command::new("sh");
     cmd.process_group(0); // use a process group to clean up children; providing '0' uses this process' id for the group
@@ -231,14 +243,14 @@ fn order_procs<'a>(procs: Vec<&'a Process>) -> Result<Vec<&'a Process>> {
   let mut ord: Vec<&'a Process> = Vec::new();
   let mut vis: HashSet<String> = HashSet::new();
   let mut set: HashMap<String, &'a Process> = HashMap::new();
-  
+
   for proc in &procs {
     set.insert(proc.key().to_string(), proc);
   }
   for proc in &procs {
     ord.append(&mut order_procs_sub(proc, &set, &mut HashSet::new(), &mut vis)?);
   }
-  
+
   Ok(ord)
 }
 
@@ -247,7 +259,7 @@ fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, ru
     Some(label) => label,
     None => proc.command(),
   };
-  
+
   let mut ord: Vec<&'a Process> = Vec::new();
   if !vis.contains(key) {
     for dep in proc.deps() {
@@ -264,21 +276,21 @@ fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, ru
     vis.insert(key.to_owned());
     ord.push(proc);
   }
-  
+
   Ok(ord)
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  
+
   #[test]
   fn test_resolve_deps() {
     let p1 = Process::new(Some("p1"), "proc 1", vec![], None);
     let p2 = Process::new(Some("p2"), "proc 2", vec!["p1"], None);
     let p3 = Process::new(Some("p3"), "proc 3", vec!["p2", "p1"], None);
     let p4 = Process::new(Some("p4"), "proc 4", vec!["p1"], None);
-    
+
     match order_procs(vec![&p2, &p3, &p1]) {
       Ok(res)  => assert_eq!(vec![&p1, &p2, &p3], res),
       Err(err) => panic!("{}", err),
@@ -287,11 +299,11 @@ mod tests {
       Ok(res)  => assert_eq!(vec![&p1, &p2, &p4, &p3], res),
       Err(err) => panic!("{}", err),
     };
-    
+
     // circular
     let p5 = Process::new(Some("p5"), "proc 5", vec!["p6"], None);
     let p6 = Process::new(Some("p6"), "proc 6", vec!["p5"], None);
-    
+
     match order_procs(vec![&p5, &p6]) {
       Ok(res)  => panic!("Cannot succeed!"),
       Err(err) => match err {
@@ -300,5 +312,5 @@ mod tests {
       },
     };
   }
-  
+
 }
