@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::os::unix::process::CommandExt;
 
 use tokio::process;
+use tokio::sync::mpsc;
 use futures::stream;
 use futures::stream::TryStreamExt;
 use futures::future::FutureExt;
@@ -36,37 +37,46 @@ impl Pod {
     }
   }
 
-  pub async fn exec(&self) -> Result<i32> {
+  pub async fn exec(&self, rx: &mut mpsc::Receiver<()>) -> Result<i32> {
     let ord: Vec<&Process> = order_procs(self.procs.iter().map(|e| e).collect())?;
     let mut tset: Vec<(&Process, process::Command)> = Vec::new();
+    let mut pset: Vec<(&Process, process::Child)> = Vec::new();
     for spec in &ord {
       tset.push((spec, spec.task()?));
     }
 
+    // run processes
+    let res = self._exec(&ord, &mut tset, &mut pset, rx).await;
+    // explicitly clean up after processes
+    Self::cleanup(&mut pset).await?;
+    // return the result
+    res
+  }
+
+  pub async fn _exec<'a>(&self, ord: &Vec<&Process>, tset: &mut Vec<(&'a Process, process::Command)>, pset: &mut Vec<(&'a Process, process::Child)>, rx: &mut mpsc::Receiver<()>) -> Result<i32> {
     eprintln!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
-    let mut pset: Vec<(&Process, process::Child)> = Vec::new();
-    for (spec, task) in &mut tset {
+    for (spec, task) in tset {
       let proc = match task.spawn() {
         Ok(proc) => proc,
         Err(err) => return Err(error::ExecError::new(&format!("Could not run process: {}; because: {}", spec, err)).into()),
       };
       eprintln!("{}", &format!("----> {}", spec).bold());
-      pset.push((spec, proc)); // add it to the set before we process it, so it's cleaned up should it fail
+      pset.push((spec, proc));
       let checks = spec.checks();
       if checks.len() > 0 {
-        match waiter::wait(checks, time::Duration::from_secs(10)).await {
-          Ok(_)    => eprintln!("{}", &format!("----> {}: available", spec.key()).bold()),
-          Err(err) => {
-            Self::cleanup(&mut pset).await?; // explicitly clean up after remaining processes on failure
-            return Err(err.into());
-          },
-        }
+        tokio::select! {
+          _ = rx.recv() =>  return Err(error::Error::CanceledError),
+          res = waiter::wait(checks, time::Duration::from_secs(10)) =>  match res {
+            Ok(_)    => eprintln!("{}", &format!("----> {}: available", spec.key()).bold()),
+            Err(err) => return Err(err.into()),
+          }
+        };
       }
     }
 
     let code = {
       let mut jobs: Vec<Pin<Box<dyn futures::Future<Output = Result<i32>>>>> = Vec::new();
-      for (_, proc) in &mut pset {
+      for (_, proc) in pset {
         jobs.push(Box::pin(proc.wait().map(|f| match f?.code() {
           Some(code) => Ok(code),
           None => Ok(0),
@@ -74,14 +84,14 @@ impl Pod {
       }
 
       let mut jobs = stream::FuturesUnordered::from_iter(jobs);
-      match jobs.try_next().await? {
-        Some(code) => code,
-        None => 0,
+      tokio::select! {
+        _ = rx.recv() =>  return Err(error::Error::CanceledError),
+        res = jobs.try_next() => match res? {
+          Some(code) => code,
+          None => 0,
+        }
       }
     };
-
-    // explicitly clean up after remaining processes
-    Self::cleanup(&mut pset).await?;
 
     eprintln!("{}", "====> finished".bold());
     Ok(code)
