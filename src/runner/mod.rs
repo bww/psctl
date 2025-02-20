@@ -66,7 +66,7 @@ impl Pod {
       if checks.len() > 0 {
         tokio::select! {
           _ = rx.recv() =>  return Err(error::Error::CanceledError),
-          res = waiter::wait(checks, time::Duration::from_secs(10)) =>  match res {
+          res = waiter::wait(checks, spec.wait) =>  match res {
             Ok(_)    => eprintln!("{}", &format!("----> {}: available", spec.key()).bold()),
             Err(err) => return Err(err.into()),
           }
@@ -122,6 +122,10 @@ impl Pod {
   }
 }
 
+fn wait_default() -> time::Duration {
+  return time::Duration::from_secs(30)
+}
+
 #[derive(PartialEq, Eq, Serialize, Deserialize)]
 pub struct Process {
   #[serde(rename(serialize="run", deserialize="run"))]
@@ -132,6 +136,8 @@ pub struct Process {
   deps: Vec<String>,
   #[serde(default="Vec::new")]
   checks: Vec<String>,
+  #[serde(with = "humantime_serde", default="wait_default")]
+  wait: time::Duration
 }
 
 impl Process {
@@ -147,6 +153,7 @@ impl Process {
         Some(url) => vec![url.to_owned()],
         None => vec![],
       },
+      wait: wait_default(),
     }
   }
 
@@ -315,9 +322,9 @@ mod tests {
     let p6 = Process::new(Some("p6"), "proc 6", vec!["p5"], None);
 
     match order_procs(vec![&p5, &p6]) {
-      Ok(res)  => panic!("Cannot succeed!"),
+      Ok(_)    => panic!("Cannot succeed!"),
       Err(err) => match err {
-        error::Error::DependencyError(error::DependencyError::Cycle(msg)) => {}, // expected error
+        error::Error::DependencyError(error::DependencyError::Cycle(_)) => {}, // expected error
         _ => panic!("Unexpected error: {}", err),
       },
     };
