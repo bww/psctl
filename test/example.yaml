@@ -4,8 +4,8 @@ tasks:
     name: a
     run: sleep 3 && echo "A"
     checks:
-      - https://hub.dummyapis.com/delay?seconds=2
-      - https://hub.dummyapis.com/delay?seconds=3
+      - https://fakeresponder.com/?sleep=2000
+      - https://fakeresponder.com/?sleep=3000
     deps:
       - b
       - c
@@ -14,12 +14,13 @@ tasks:
     name: b
     run: sleep 10 && echo "B"
     checks:
-      - https://hub.dummyapis.com/delay?seconds=2
+      - https://fakeresponder.com/?sleep=3000
+    wait: 2s
 
   -
     name: c
     run: sleep 10 && echo "C"
     checks:
-      - https://hub.dummyapis.com/delay?seconds=2
+      - https://fakeresponder.com/?sleep=2000
     deps:
       - b

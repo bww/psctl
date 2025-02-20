@@ -10,6 +10,7 @@ use url;
 use futures::Future;
 use futures::future::try_join_all;
 use tokio::time::sleep;
+use humantime::format_duration;
 
 type Result<T> = result::Result<T, error::Error>;
 
@@ -33,7 +34,7 @@ pub fn wait_jobs<'a>(urls: &'a Vec<String>, timeout: time::Duration) -> Result<V
   Ok(jobs)
 }
 
-async fn wait_fn<F>(url: &str, deadline: SystemTime, func: F) -> Result<()> 
+async fn wait_fn<F>(url: &str, deadline: SystemTime, func: F) -> Result<()>
 where
   F: Fn(String, time::Duration) -> Pin<Box<dyn Future<Output = Result<bool>>>>
 {
@@ -48,7 +49,7 @@ where
     }
     let after = SystemTime::now();
     if after + wait >= deadline {
-      return Err(error::AwaitError::new(&format!("Deadline exceeded: {}", url)).into());
+      return Err(error::AwaitError::new(&format!("Deadline exceeded ({} elapsed): {}", format_duration(after.duration_since(before)?), url)).into());
     } else {
       let elapsed = after.duration_since(before)?;
       if elapsed < wait {
