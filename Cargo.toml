@@ -5,7 +5,7 @@ edition = "2021"
 description = "Process Control is an operator for related processes. It runs processes as an interdependent graph."
 repository = "https://github.com/bww/psctl"
 readme = "README.md"
-license = "BSD-3-Clause"
+license = "MIT"
 
 [dependencies]
 clap = { version = "3.1", features = ["derive"] }
