@@ -2,7 +2,7 @@
 name = "psctl"
 version = "0.5.0-1"
 edition = "2021"
-description = "An operator for local processes"
+description = "Process Control is an operator for related processes. It runs processes as an interdependent graph."
 repository = "https://github.com/bww/psctl"
 readme = "README.md"
 license = "BSD-3-Clause"
