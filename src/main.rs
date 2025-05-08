@@ -1,13 +1,11 @@
 use std::fs;
 use std::process;
 
-use tokio;
 use tokio::sync::mpsc;
 use futures::executor;
 use clap::Parser;
 use serde::{Serialize, Deserialize};
 use colored::Colorize;
-use ctrlc;
 
 mod waiter;
 mod runner;
@@ -81,7 +79,7 @@ async fn cmd() -> Result<i32, error::Error> {
     procs
   };
 
-  if procs.len() < 1 {
+  if procs.is_empty() {
     Ok(0) // nothing to do
   }else{
     Ok(runner::Pod::new(procs).exec(&mut rx).await?)

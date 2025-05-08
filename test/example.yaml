@@ -1,6 +1,12 @@
 version: 1
 tasks:
   -
+    name: d
+    run: sleep 10 && echo "D"
+    checks:
+      - shell:echo "check" && exit 1
+
+  -
     name: a
     run: sleep 3 && echo "A"
     checks:

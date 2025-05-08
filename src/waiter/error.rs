@@ -29,6 +29,7 @@ pub enum Error {
   AwaitError(AwaitError),
   ParseURLError(url::ParseError),
   ReqwestError(reqwest::Error),
+  CommandError(String),
   SystemTimeError(std::time::SystemTimeError),
 }
 
@@ -69,6 +70,7 @@ impl fmt::Display for Error {
       Self::AwaitError(err) => err.fmt(f),
       Self::ParseURLError(err) => err.fmt(f),
       Self::ReqwestError(err) => err.fmt(f),
+      Self::CommandError(msg) => write!(f, "{}", msg),
       Self::SystemTimeError(err) => err.fmt(f),
     }
   }

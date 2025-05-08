@@ -6,7 +6,6 @@ use std::pin::Pin;
 use std::time::SystemTime;
 use std::result;
 
-use url;
 use futures::Future;
 use futures::future::try_join_all;
 use tokio::time::sleep;
@@ -28,6 +27,7 @@ pub fn wait_jobs<'a>(urls: &'a Vec<String>, timeout: time::Duration) -> Result<V
     match scheme {
       "http" | "https" => jobs.push(Box::pin(wait_http(base, deadline))),
       "file"           => jobs.push(Box::pin(wait_file(base, deadline))),
+      "shell"          => jobs.push(Box::pin(wait_shell(base, deadline))),
       _                => return Err(error::AwaitError::new(&format!("Scheme '{}' not supported: {}", scheme, base)).into())
     }
   }
@@ -76,6 +76,31 @@ async fn wait_file(url: &str, deadline: SystemTime) -> Result<()> {
       match url::Url::parse(&u) {
         Ok(u)    => Ok(path::Path::new(u.path()).exists()),
         Err(err) => Err(err.into()),
+      }
+    })
+  }).await
+}
+
+async fn wait_shell(url: &str, deadline: SystemTime) -> Result<()> {
+  wait_fn(url, deadline, |u, _| {
+    Box::pin(async move {
+      let cmd = match url::Url::parse(&u) {
+        Ok(u) => {
+          let s = u.as_str();
+          match s.find(":") {
+            Some(n) => s[n+1..].to_owned(),
+            None    => s.to_owned(),
+          }
+        },
+        Err(err) => return Err(err.into()),
+      };
+      let status = std::process::Command::new("sh")
+        .arg("-c").arg(cmd)
+        .spawn()?
+        .wait()?;
+      match status.success() {
+        true  => Ok(true),
+        _     => Err(error::Error::CommandError("Exited with error".to_string())),
       }
     })
   }).await
