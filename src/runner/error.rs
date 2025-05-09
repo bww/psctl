@@ -42,6 +42,7 @@ pub enum Error {
   ExecError(ExecError),
   DependencyError(DependencyError),
   CanceledError,
+  NeverInitializedError(String),
 }
 
 impl From<io::Error> for Error {
@@ -76,6 +77,7 @@ impl fmt::Display for Error {
       Self::ExecError(err) => err.fmt(f),
       Self::DependencyError(err) => err.fmt(f),
       Self::CanceledError => write!(f, "Canceled"),
+      Self::NeverInitializedError(key) => write!(f, "{}: exited before it became available", key),
     }
   }
 }

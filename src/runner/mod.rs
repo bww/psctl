@@ -55,22 +55,30 @@ impl Pod {
 
   pub async fn _exec<'a>(&self, ord: &Vec<&Process>, tset: &mut Vec<(&'a Process, process::Command)>, pset: &mut Vec<(&'a Process, process::Child)>, rx: &mut mpsc::Receiver<()>) -> Result<i32> {
     eprintln!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
+
     for (spec, task) in tset {
-      let proc = match task.spawn() {
+      let mut proc = match task.spawn() {
         Ok(proc) => proc,
         Err(err) => return Err(error::ExecError::new(&format!("Could not run process: {}; because: {}", spec, err)).into()),
       };
       eprintln!("{}", &format!("----> {}", spec).bold());
-      pset.push((spec, proc));
       let checks = spec.checks();
-      if checks.len() > 0 {
+      let res = if !checks.is_empty(){
         tokio::select! {
-          _ = rx.recv() =>  return Err(error::Error::CanceledError),
+          _   = rx.recv()   => Err(error::Error::CanceledError),
+          _   = proc.wait() => Err(error::Error::NeverInitializedError(spec.key().to_owned())),
           res = waiter::wait(checks, spec.wait) =>  match res {
-            Ok(_)    => eprintln!("{}", &format!("----> {}: available", spec.key()).bold()),
-            Err(err) => return Err(err.into()),
+            Ok(_)    => Ok(spec.key()),
+            Err(err) => Err(err.into()),
           }
-        };
+        }
+      } else {
+        Ok(spec.key()) // immediately available if we have no checks
+      };
+      pset.push((spec, proc));
+      match res {
+        Ok(key)  => eprintln!("{}", &format!("----> {}: available", key).bold()),
+        Err(err) => return Err(err),
       }
     }
 
@@ -86,10 +94,7 @@ impl Pod {
       let mut jobs = stream::FuturesUnordered::from_iter(jobs);
       tokio::select! {
         _ = rx.recv() =>  return Err(error::Error::CanceledError),
-        res = jobs.try_next() => match res? {
-          Some(code) => code,
-          None => 0,
-        }
+        res = jobs.try_next() => (res?).unwrap_or_default(),
       }
     };
 
