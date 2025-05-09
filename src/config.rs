@@ -28,7 +28,14 @@ Any number of task specifiers may be provided as arguments. Each specifier has t
     label    := /[a-zA-Z0-9]+/
     deps     := '+' <labels>
     command  := /[^=]+/
-    check    := a file:// or http(s):// url
+    check    := <scheme>://<content>
+
+READINESS CHECKS
+    Readiness checks are expressed as a URL. The following types are supported:
+
+    http(s)://...      The check passes when the URL returns 2XX
+    file://...         The check passes when the file exists
+    shell://<command>  The check passes when the command exists with status 0
 
 EXAMPLE
 
