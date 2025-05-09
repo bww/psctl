@@ -35,7 +35,7 @@ READINESS CHECKS
 
     http(s)://...      The check passes when the URL returns 2XX
     file://...         The check passes when the file exists
-    shell://<command>  The check passes when the command exists with status 0
+    shell://<command>  The check passes when the command exits with status 0
 
 EXAMPLE
 
