@@ -44,7 +44,7 @@ async fn cmd() -> Result<i32, error::Error> {
     procs
   };
 
-  if opts.debug {
+  if opts.debug() {
     let name = env!("CARGO_PKG_NAME");
     let version = env!("CARGO_PKG_VERSION");
     eprintln!("{}", &format!("====> {} {}, at your service", name, version).bold().cyan());
