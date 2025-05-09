@@ -1,0 +1,13 @@
+version: 1
+tasks:
+  -
+    name: a
+    run: sleep 3 && echo "A"
+
+  -
+    name: b
+    run: sleep 3 && echo "B"
+
+  -
+    name: c
+    run: sleep 3 && echo "C"
