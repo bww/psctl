@@ -13,7 +13,6 @@ mod runner;
 mod error;
 mod config;
 
-
 #[tokio::main]
 async fn main() {
   match cmd().await {
@@ -44,6 +43,12 @@ async fn cmd() -> Result<i32, error::Error> {
     }
     procs
   };
+
+  if opts.debug {
+    let name = env!("CARGO_PKG_NAME");
+    let version = env!("CARGO_PKG_VERSION");
+    eprintln!("{}", &format!("====> {} {}, at your service", name, version).bold().cyan());
+  }
 
   if procs.is_empty() {
     Ok(0) // nothing to do

@@ -1,6 +1,6 @@
 [package]
 name = "psctl"
-version = "0.5.0-1"
+version = "0.6.1"
 edition = "2021"
 description = "Process Control is an operator for related processes. It runs processes as an interdependent graph."
 repository = "https://github.com/bww/psctl"
