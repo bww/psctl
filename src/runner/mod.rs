@@ -23,16 +23,19 @@ use nix::sys::signal;
 use nix::sys::signal::Signal;
 
 use crate::waiter;
+use crate::config;
 
 type Result<T> = result::Result<T, error::Error>;
 
 pub struct Pod {
+  opts:  config::Options,
   procs: Vec<Process>,
 }
 
 impl Pod {
-  pub fn new(procs: Vec<Process>) -> Pod {
+  pub fn new(opts: config::Options, procs: Vec<Process>) -> Pod {
     Pod{
+      opts: opts, 
       procs: procs,
     }
   }
@@ -77,7 +80,7 @@ impl Pod {
       };
       pset.push((spec, proc));
       match res {
-        Ok(key)  => eprintln!("{}", &format!("----> {}: available", key).bold()),
+        Ok(key)  => if self.opts.verbose { eprintln!("{}", &format!("----> {}: available", key).bold()) },
         Err(err) => return Err(err),
       }
     }

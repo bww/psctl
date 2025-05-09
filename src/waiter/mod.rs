@@ -41,10 +41,7 @@ where
   let wait = time::Duration::from_secs(1);
   loop {
     let before = SystemTime::now();
-    if match func(url.to_string(), deadline.duration_since(SystemTime::now())?).await {
-      Ok(res) => res,
-      Err(_)  => false, // maybe log this?
-    } {
+    if (func(url.to_string(), deadline.duration_since(SystemTime::now())?).await).unwrap_or_default() {
       return Ok(()); // success
     }
     let after = SystemTime::now();

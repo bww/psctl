@@ -1,17 +1,18 @@
 version: 1
 tasks:
   -
+    name: d
+    run: sleep 4 && echo "D"
+    wait: 2s
+    checks:
+      - shell:echo "first"
+      - shell:echo "second" && exit 1
+
+  -
     name: e
     run: sleep 3 && echo "E"
     checks:
       - shell:echo "E is ready; let's go"
-
-  -
-    name: d
-    run: sleep 4 && echo "D"
-    checks:
-      - shell:echo "first"
-      - shell:echo "second" && exit 1
 
   -
     name: a
