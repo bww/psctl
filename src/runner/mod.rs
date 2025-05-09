@@ -71,16 +71,16 @@ impl Pod {
           _   = rx.recv()   => Err(error::Error::CanceledError),
           _   = proc.wait() => Err(error::Error::NeverInitializedError(spec.key().to_owned())),
           res = waiter::wait(checks, spec.wait) =>  match res {
-            Ok(_)    => Ok(spec.key()),
+            Ok(_)    => Ok((spec.key(), false)),
             Err(err) => Err(err.into()),
           }
         }
       } else {
-        Ok(spec.key()) // immediately available if we have no checks
+        Ok((spec.key(), true)) // immediately available if we have no checks
       };
       pset.push((spec, proc));
       match res {
-        Ok(key)  => if self.opts.verbose { eprintln!("{}", &format!("----> {}: available", key).bold()) },
+        Ok((key, dflt))  => if !dflt || self.opts.verbose { eprintln!("{}", &format!("----> {}: available", key).bold()) },
         Err(err) => return Err(err),
       }
     }
