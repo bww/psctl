@@ -34,8 +34,8 @@ pub async fn wait_config(conf: &Config, urls: &Vec<String>, timeout: time::Durat
   if conf.verbose {
     for u in urls {
       match &conf.key {
-        Some(key) => eprintln!("{}", &format!("----> {}: {}", key, u).blue()),
-        None      => eprintln!("{}", &format!("----> {}", u).blue()),
+        Some(key) => eprintln!("{}", &format!("----> {}: ... {}", key, u).italic()),
+        None      => eprintln!("{}", &format!("----> ... {}", u).italic()),
       }
     }
   }
