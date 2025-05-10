@@ -27,12 +27,14 @@ use nix::sys::signal::Signal;
 
 use crate::waiter;
 use crate::config;
+use crate::colorwheel;
 
 type Result<T> = result::Result<T, error::Error>;
 
 pub struct Pod {
   opts:  config::Options,
   procs: Vec<Process>,
+  wheel: colorwheel::Wheel,
 }
 
 impl Pod {
@@ -40,6 +42,7 @@ impl Pod {
     Pod{
       opts: opts,
       procs: procs,
+      wheel: colorwheel::Wheel::default(),
     }
   }
 
@@ -63,6 +66,7 @@ impl Pod {
     eprintln!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
     let maxkey: usize = min(32, tset.iter().map(|(spec, _)| spec.key().len()).max().unwrap_or(0));
 
+    let mut i: usize = 0;
     for (spec, task) in tset {
       let mut proc = match task.spawn() {
         Ok(proc) => proc,
@@ -79,7 +83,7 @@ impl Pod {
       };
 
       let key_stdout = match self.opts.prefix() {
-        true  => Some(format!("[{}]", spec.key_with_padding(maxkey)).bold()),
+        true  => Some(format!("[ {} ]", self.wheel.colorize(i, spec.key_with_padding(maxkey)))),
         false => None,
       };
       tokio::spawn(async move {
@@ -91,7 +95,7 @@ impl Pod {
       });
 
       let key_stderr = match self.opts.prefix() {
-        true  => Some(format!("[{}]", spec.key_with_padding(maxkey)).bold()),
+        true  => Some(format!("[ {} ]", self.wheel.colorize(i, spec.key_with_padding(maxkey)))),
         false => None,
       };
       tokio::spawn(async move {
@@ -122,6 +126,8 @@ impl Pod {
         Ok((key, dflt))  => if !dflt || self.opts.verbose() { eprintln!("{}", &format!("----> {}: available", key).bold()) },
         Err(err) => return Err(err),
       }
+
+      i = i + 1;
     }
 
     let code = {

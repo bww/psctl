@@ -12,6 +12,7 @@ mod waiter;
 mod runner;
 mod error;
 mod config;
+mod colorwheel;
 
 #[tokio::main]
 async fn main() {
