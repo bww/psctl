@@ -1,4 +1,4 @@
-![GitHub Release](https://img.shields.io/github/v/release/bww/psctl) ![Crates.io Version](https://img.shields.io/crates/v/psctl)
+[![GitHub Release](https://img.shields.io/github/v/release/bww/psctl)](https://github.com/bww/psctl/releases) [![Crates.io Version](https://img.shields.io/crates/v/psctl)](https://crates.io/crates/psctl)
 
 # Process Control (or PSCTL, if you prefer)
 PSCTL is a simple command-line process management tool. It runs processes as an interdependent graph.
