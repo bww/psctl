@@ -1,0 +1,33 @@
+version: 1
+tasks:
+  -
+    # Process 'a' depends on 'b' and 'c', it is started after both 'a' and
+    # 'b' are available.
+    name: a
+    run: sleep 3 && echo "A"
+    deps:
+      - b
+      - c
+
+  -
+    # Process 'b' has no direct dependencies so it it started first.
+    name: b
+    run: sleep 10 && echo "B"
+    # Availability checks are used to determine when a process has become
+    # available. Once a process is available, processes that depend on it
+    # will be started.
+    checks:
+      - shell:sleep 2
+    # Wait up to 30 second for this process to become available. If all our
+    # availability checks don't pass by this deadline, an error is produced.
+    wait: 30s
+
+  -
+    # Process 'c' depends on 'b', it is started after process 'b' becomes
+    # available.
+    name: c
+    run: sleep 10 && echo "C"
+    checks:
+      - https://hub.dummyapis.com/delay?seconds=2
+    deps:
+      - b

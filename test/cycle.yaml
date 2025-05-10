@@ -1,0 +1,20 @@
+version: 1
+tasks:
+  -
+    name: a
+    run: echo "A" && sleep 1 && echo "A.1" && sleep 9
+
+  -
+    name: c
+    run: sleep 10 && echo "C"
+    checks:
+      - shell:sleep 2
+    deps:
+      - a
+      - b
+
+  -
+    name: b
+    run: echo "B" && sleep 1 && echo "B.1" && sleep 9
+    deps:
+      - c
