@@ -238,14 +238,14 @@ impl Process {
     Ok(Self::new(label, cmd, deps, check))
   }
 
-  fn key(& self) -> &str {
+  fn key(&self) -> &str {
     match self.label() {
       Some(label) => label,
       None => self.command(),
     }
   }
 
-  fn key_with_padding(& self, nchar: usize) -> String {
+  fn key_with_padding(&self, nchar: usize) -> String {
     let mut key = self.key().to_owned();
     let l = key.len();
     if l > nchar {
@@ -256,7 +256,7 @@ impl Process {
     key
   }
 
-  pub fn label(& self) -> Option<&str> {
+  pub fn label(&self) -> Option<&str> {
     match &self.label {
       Some(label) => Some(label),
       None => None,
