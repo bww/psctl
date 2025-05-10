@@ -1,6 +1,6 @@
 [package]
 name = "psctl"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 description = "Process Control is an operator for related processes. It runs processes as an interdependent graph."
 repository = "https://github.com/bww/psctl"
@@ -17,7 +17,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 humantime = "2.1.0"
 humantime-serde = "1.1.1"
-colored = "2.0.0"
+colored = "3.0.0"
 nix = "0.26.2"
 ctrlc = "3.4"
 parse_duration = "2.1.1"

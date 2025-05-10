@@ -36,22 +36,30 @@ The following process configuration file is illustrative:
 version: 1
 tasks:
   -
+    # Process 'a' depends on 'b' and 'c', it is started after both 'a' and
+    # 'b' are available.
     name: a
     run: sleep 3 && echo "A"
-    checks:
-      - https://hub.dummyapis.com/delay?seconds=2
-      - https://hub.dummyapis.com/delay?seconds=3
     deps:
       - b
       - c
 
   -
+    # Process 'b' has no direct dependencies so it it started first.
     name: b
     run: sleep 10 && echo "B"
+    # Availability checks are used to determine when a process has become
+    # available. Once a process is available, processes that depend on it
+    # will be started.
     checks:
-      - https://hub.dummyapis.com/delay?seconds=2
+      - shell:sleep 2
+    # Wait up to 30 second for this process to become available. If all our
+    # availability checks don't pass by this deadline, an error is produced.
+    wait: 30s
 
   -
+    # Process 'c' depends on 'b', it is started after process 'b' becomes
+    # available.
     name: c
     run: sleep 10 && echo "C"
     checks:
@@ -61,7 +69,17 @@ tasks:
 
 ```
 
-It can be run as follows:
+### Types of Availability Checks
+Several types of availability checks are supported. They are described as a URL:
+
+| Type            | Example                        | Description                                   |
+|-----------------|--------------------------------|-----------------------------------------------|
+| `http`, `https` | `http://localhost:8001/status` | Available when the service returns `2XX`      |
+| `file`          | `file:///tmp/sock`             | Available when the file exists                |
+| `shell`         | `shell:nc -z localhost 8001`   | Available when the command exits w/ status `0`|
+
+### Running PSCTL
+The example above can be run as follows:
 
 ```
 $ psctl --file test/example.yaml
@@ -69,7 +87,7 @@ $ psctl --file test/example.yaml
 ----> b: sleep 10 && echo "B" (https://hub.dummyapis.com/delay?seconds=2)
 ----> c: sleep 10 && echo "C" (https://hub.dummyapis.com/delay?seconds=2)
 ----> a: sleep 3 && echo "A" (https://hub.dummyapis.com/delay?seconds=2; https://hub.dummyapis.com/delay?seconds=3)
-A
+[ a ] A
 ====> finished
 ```
 

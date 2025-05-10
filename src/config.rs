@@ -15,6 +15,8 @@ pub struct Options {
   pub debug: bool,
   #[clap(long, help="Enable verbose output")]
   pub verbose: bool,
+  #[clap(long, help="Enable quiet mode, only required output is displayed")]
+  pub quiet: bool,
   #[clap(long, help="Load process specifiers from a taskfile")]
   pub file: Option<String>,
   #[clap(
@@ -42,4 +44,22 @@ EXAMPLE
     $ psctl 'a: echo A' 'b: echo B=file:///tmp/file' 'c +a,b: echo C'
 ")]
   pub specs: Vec<String>,
+}
+
+impl Options {
+  pub fn debug(&self) -> bool {
+    self.debug
+  }
+
+  pub fn verbose(&self) -> bool {
+    self.debug || self.verbose
+  }
+
+  pub fn quiet(&self) -> bool {
+    self.quiet && !self.verbose()
+  }
+
+  pub fn prefix(&self) -> bool {
+    !self.quiet()
+  }
 }

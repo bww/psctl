@@ -7,13 +7,38 @@ use std::time::SystemTime;
 use std::result;
 
 use futures::Future;
+use colored::Colorize;
 use futures::future::try_join_all;
 use tokio::time::sleep;
 use humantime::format_duration;
 
+use crate::config;
+
 type Result<T> = result::Result<T, error::Error>;
 
-pub async fn wait(urls: &Vec<String>, timeout: time::Duration) -> Result<()> {
+pub struct Config {
+  pub key: Option<String>,
+  pub verbose: bool,
+}
+
+impl Config {
+  pub fn from_options(key: String, opts: &config::Options) -> Self {
+    Self{
+      key: Some(key),
+      verbose: opts.verbose(),
+    }
+  }
+}
+
+pub async fn wait_config(conf: &Config, urls: &Vec<String>, timeout: time::Duration) -> Result<()> {
+  if conf.verbose {
+    for u in urls {
+      match &conf.key {
+        Some(key) => eprintln!("{}", &format!("----> {}: ... {}", key, u).italic()),
+        None      => eprintln!("{}", &format!("----> ... {}", u).italic()),
+      }
+    }
+  }
   try_join_all(wait_jobs(urls, timeout)?).await?;
   Ok(())
 }

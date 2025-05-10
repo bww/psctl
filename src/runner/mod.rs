@@ -4,12 +4,15 @@ use core::time;
 
 use std::io;
 use std::fmt;
+use std::cmp::min;
 use std::result;
 use std::pin::Pin;
+use std::process::Stdio;
 use std::collections::HashSet;
 use std::collections::HashMap;
 use std::os::unix::process::CommandExt;
 
+use tokio::io::{BufReader, AsyncBufReadExt};
 use tokio::process;
 use tokio::sync::mpsc;
 use futures::stream;
@@ -24,19 +27,22 @@ use nix::sys::signal::Signal;
 
 use crate::waiter;
 use crate::config;
+use crate::colorwheel;
 
 type Result<T> = result::Result<T, error::Error>;
 
 pub struct Pod {
   opts:  config::Options,
   procs: Vec<Process>,
+  wheel: colorwheel::Wheel,
 }
 
 impl Pod {
   pub fn new(opts: config::Options, procs: Vec<Process>) -> Pod {
     Pod{
-      opts: opts, 
+      opts: opts,
       procs: procs,
+      wheel: colorwheel::Wheel::default(),
     }
   }
 
@@ -58,19 +64,56 @@ impl Pod {
 
   pub async fn _exec<'a>(&self, ord: &Vec<&Process>, tset: &mut Vec<(&'a Process, process::Command)>, pset: &mut Vec<(&'a Process, process::Child)>, rx: &mut mpsc::Receiver<()>) -> Result<i32> {
     eprintln!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
+    let maxkey: usize = min(32, tset.iter().map(|(spec, _)| spec.key().len()).max().unwrap_or(0));
 
+    let mut i: usize = 0;
     for (spec, task) in tset {
       let mut proc = match task.spawn() {
         Ok(proc) => proc,
         Err(err) => return Err(error::ExecError::new(&format!("Could not run process: {}; because: {}", spec, err)).into()),
       };
+
+      let mut stdout = match proc.stdout.take() {
+        Some(stdout) => BufReader::new(stdout).lines(),
+        None         => return Err(error::ExecError::new(&format!("Could not configure process STDOUT: {}", spec)).into()),
+      };
+      let mut stderr = match proc.stderr.take() {
+        Some(stderr) => BufReader::new(stderr).lines(),
+        None         => return Err(error::ExecError::new(&format!("Could not configure process STDERR: {}", spec)).into()),
+      };
+
+      let key_stdout = match self.opts.prefix() {
+        true  => Some(format!("[ {} ]", self.wheel.colorize(i, spec.key_with_padding(maxkey)))),
+        false => None,
+      };
+      tokio::spawn(async move {
+        while let Some(line) = stdout.next_line().await.expect("Could not read from STDOUT") {
+          if let Some(pfx) = &key_stdout {
+            println!("{} {}", pfx, line);
+          }
+        }
+      });
+
+      let key_stderr = match self.opts.prefix() {
+        true  => Some(format!("[ {} ]", self.wheel.colorize(i, spec.key_with_padding(maxkey)))),
+        false => None,
+      };
+      tokio::spawn(async move {
+        while let Some(line) = stderr.next_line().await.expect("Could not read from STDERR") {
+          if let Some(pfx) = &key_stderr {
+            println!("{} {}", pfx, line);
+          }
+        }
+      });
+
       eprintln!("{}", &format!("----> {}", spec).bold());
       let checks = spec.checks();
       let res = if !checks.is_empty(){
+        let waitconf = waiter::Config::from_options(spec.key().to_owned(), &self.opts);
         tokio::select! {
           _   = rx.recv()   => Err(error::Error::CanceledError),
           _   = proc.wait() => Err(error::Error::NeverInitializedError(spec.key().to_owned())),
-          res = waiter::wait(checks, spec.wait) =>  match res {
+          res = waiter::wait_config(&waitconf, checks, spec.wait) =>  match res {
             Ok(_)    => Ok((spec.key(), false)),
             Err(err) => Err(err.into()),
           }
@@ -80,9 +123,11 @@ impl Pod {
       };
       pset.push((spec, proc));
       match res {
-        Ok((key, dflt))  => if !dflt || self.opts.verbose { eprintln!("{}", &format!("----> {}: available", key).bold()) },
+        Ok((key, dflt))  => if !dflt || self.opts.verbose() { eprintln!("{}", &format!("----> {}: available", key).bold()) },
         Err(err) => return Err(err),
       }
+
+      i = i + 1;
     }
 
     let code = {
@@ -152,10 +197,7 @@ impl Process {
   pub fn new(label: Option<&str>, cmd: &str, deps: Vec<&str>, url: Option<&str>) -> Process {
     Process{
       command: cmd.to_owned(),
-      label: match label {
-        Some(label) => Some(label.to_owned()),
-        None => None,
-      },
+      label: label.map(|label| label.to_owned()),
       deps: deps.iter().map(|e| e.to_string()).collect(),
       checks: match url {
         Some(url) => vec![url.to_owned()],
@@ -196,29 +238,40 @@ impl Process {
     Ok(Self::new(label, cmd, deps, check))
   }
 
-  fn key<'a>(&'a self) -> &'a str {
+  fn key(&self) -> &str {
     match self.label() {
       Some(label) => label,
       None => self.command(),
     }
   }
 
-  pub fn label<'a>(&'a self) -> Option<&'a str> {
+  fn key_with_padding(&self, nchar: usize) -> String {
+    let mut key = self.key().to_owned();
+    let l = key.len();
+    if l > nchar {
+      key.truncate(nchar);
+    } else {
+      key.push_str(&(" ".repeat(nchar - l)));
+    }
+    key
+  }
+
+  pub fn label(&self) -> Option<&str> {
     match &self.label {
       Some(label) => Some(label),
       None => None,
     }
   }
 
-  pub fn deps<'a>(&'a self) -> &'a Vec<String> {
+  pub fn deps(&self) -> &Vec<String> {
     &self.deps
   }
 
-  pub fn command<'a>(&'a self) -> &'a str {
+  pub fn command(&self) -> &str {
     &self.command
   }
 
-  pub fn checks<'a>(&'a self) -> &'a Vec<String> {
+  pub fn checks(&self) -> &Vec<String> {
     &self.checks
   }
 
@@ -238,6 +291,8 @@ impl Process {
 
   fn task(&self) -> Result<process::Command> {
     let mut cmd = std::process::Command::new("sh");
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
     cmd.process_group(0); // use a process group to clean up children; providing '0' uses this process' id for the group
     cmd.arg("-c").arg(self.command());
     Ok(cmd.into())
@@ -251,8 +306,10 @@ impl fmt::Display for Process {
       d.push_str(&format!("{}: ", l));
     }
     d.push_str(self.command());
-    if self.checks.len() > 0 {
-      d.push_str(&format!(" ({})", self.checks.join("; ")));
+    match self.checks.len() {
+      0 => {},
+      1 => d.push_str(&format!(" ({})", self.checks[0])),
+      n => d.push_str(&format!(" ({})", &format!("{} checks", n).italic())),
     }
     write!(f, "{}", &d)
   }

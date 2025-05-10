@@ -1,0 +1,8 @@
+version: 1
+tasks:
+  -
+    name: or else here's a very long one
+    run: cat src/main.rs
+  # -
+  #   name: b
+  #   run: echo "--------------------"
