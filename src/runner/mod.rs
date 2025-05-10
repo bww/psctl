@@ -57,13 +57,15 @@ impl Pod {
     // run processes
     let res = self._exec(&ord, &mut tset, &mut pset, rx).await;
     // explicitly clean up after processes
-    Self::cleanup(&mut pset).await?;
+    Self::cleanup(&self.opts, &mut pset).await?;
     // return the result
     res
   }
 
   pub async fn _exec<'a>(&self, ord: &Vec<&Process>, tset: &mut Vec<(&'a Process, process::Command)>, pset: &mut Vec<(&'a Process, process::Child)>, rx: &mut mpsc::Receiver<()>) -> Result<i32> {
-    eprintln!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
+    if !self.opts.quiet() {
+      eprintln!("{}", &format!("====> {}", ord.iter().map(|e| e.key()).collect::<Vec<&str>>().join(", ")).bold());
+    }
     let maxkey: usize = min(32, tset.iter().map(|(spec, _)| spec.key().len()).max().unwrap_or(0));
 
     let mut i: usize = 0;
@@ -106,7 +108,9 @@ impl Pod {
         }
       });
 
-      eprintln!("{}", &format!("----> {}", spec).bold());
+      if !self.opts.quiet() {
+        eprintln!("{}", &format!("----> {}", spec).bold());
+      }
       let checks = spec.checks();
       let res = if !checks.is_empty(){
         let waitconf = waiter::Config::from_options(spec.key().to_owned(), &self.opts);
@@ -123,7 +127,9 @@ impl Pod {
       };
       pset.push((spec, proc));
       match res {
-        Ok((key, dflt))  => if !dflt || self.opts.verbose() { eprintln!("{}", &format!("----> {}: available", key).bold()) },
+        Ok((key, dflt))  => if (!dflt && !self.opts.quiet()) || self.opts.verbose() {
+          eprintln!("{}", &format!("----> {}: available", key).bold());
+        },
         Err(err) => return Err(err),
       }
 
@@ -146,11 +152,13 @@ impl Pod {
       }
     };
 
-    eprintln!("{}", "====> finished".bold());
+    if !self.opts.quiet() {
+      eprintln!("{}", "====> finished".bold());
+    }
     Ok(code)
   }
 
-  async fn cleanup(pset: &mut Vec<(&Process, process::Child)>) -> Result<()> {
+  async fn cleanup(opts: &config::Options, pset: &mut Vec<(&Process, process::Child)>) -> Result<()> {
     // explicitly clean up after remaining processes
     for (spec, proc) in pset {
       if let Some(pid) = proc.id() { // negative-pid addresses the process group
@@ -160,11 +168,15 @@ impl Pod {
         }
         match proc.wait().await {
           Ok(_) => {
-            eprintln!("{}", &format!("~~~~> {} [{} killed]", spec, pid).bold());
+            if !opts.quiet() {
+              eprintln!("{}", &format!("~~~~> {} [{} killed]", spec, pid).bold());
+            }
           },
           Err(err) => match err.kind() {
             io::ErrorKind::InvalidInput => {
-              eprintln!("{}", &format!("~~~~> {} [{} ended]", spec, pid).bold());
+              if !opts.quiet() {
+                eprintln!("{}", &format!("~~~~> {} [{} ended]", spec, pid).bold());
+              }
             },
             _ => return Err(error::Error::IOError(err)),
           },
@@ -325,18 +337,19 @@ fn order_procs<'a>(procs: Vec<&'a Process>) -> Result<Vec<&'a Process>> {
   let mut ord: Vec<&'a Process> = Vec::new();
   let mut vis: HashSet<String> = HashSet::new();
   let mut set: HashMap<String, &'a Process> = HashMap::new();
+  let mut path: Vec<&'a Process> = Vec::new();
 
   for proc in &procs {
     set.insert(proc.key().to_string(), proc);
   }
   for proc in &procs {
-    ord.append(&mut order_procs_sub(proc, &set, &mut HashSet::new(), &mut vis)?);
+    ord.append(&mut order_procs_sub(proc, &set, &mut HashSet::new(), &mut vis, &mut path)?);
   }
 
   Ok(ord)
 }
 
-fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, run: &mut HashSet<String>, vis: &mut HashSet<String>) -> Result<Vec<&'a Process>> {
+fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, run: &mut HashSet<String>, vis: &mut HashSet<String>, path: &mut Vec<&'a Process>) -> Result<Vec<&'a Process>> {
   let key = match proc.label() {
     Some(label) => label,
     None => proc.command(),
@@ -345,15 +358,17 @@ fn order_procs_sub<'a>(proc: &'a Process, set: &HashMap<String, &'a Process>, ru
   let mut ord: Vec<&'a Process> = Vec::new();
   if !vis.contains(key) {
     for dep in proc.deps() {
+      path.push(proc);
       if run.contains(dep) {
-        return Err(error::DependencyError::Cycle(format!("{} in {:?}", dep, run)).into());
+        return Err(error::DependencyError::Cycle(format!("{}", path.iter().map(|e| e.key()).collect::<Vec<&str>>().join(" → "))).into());
       }
       run.insert(dep.to_owned());
       match set.get(dep) {
-        Some(dep) => ord.append(&mut order_procs_sub(dep, set, run, vis)?),
+        Some(dep) => ord.append(&mut order_procs_sub(dep, set, run, vis, path)?),
         None => return Err(error::ExecError::new(&format!("Unknown dependency: {}", dep)).into()),
       };
       run.remove(dep);
+      path.pop();
     }
     vis.insert(key.to_owned());
     ord.push(proc);
