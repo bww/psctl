@@ -13,11 +13,11 @@ https://crates.io/crates/psctl",
 pub struct Options {
   #[clap(long, help="Enable debugging mode")]
   pub debug: bool,
-  #[clap(long, help="Enable verbose output")]
+  #[clap(long, short='v', help="Enable verbose output")]
   pub verbose: bool,
-  #[clap(long, help="Enable quiet mode, only required output is displayed")]
+  #[clap(long, short='q', help="Enable quiet mode, only managed process output and errors are displayed")]
   pub quiet: bool,
-  #[clap(long, help="Load process specifiers from a taskfile")]
+  #[clap(long, short='f', help="Load process specifiers from a taskfile")]
   pub file: Option<String>,
   #[clap(
     help_heading="SPECIFIERS",

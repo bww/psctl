@@ -30,7 +30,7 @@ pub enum DependencyError {
 impl fmt::Display for DependencyError {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Cycle(msg) => write!(f, "Cycle: {}", msg),
+      Self::Cycle(msg) => write!(f, "Cycle in dependency graph: {}", msg),
     }
   }
 }
