@@ -1,8 +1,8 @@
 version: 1
 tasks:
   -
-    name: or else here's a very long one
-    run: cat src/main.rs
-  # -
-  #   name: b
-  #   run: echo "--------------------"
+    name: a
+    run: curl -sSL https://raw.githubusercontent.com/bww/psctl/refs/heads/master/README.md
+  -
+    name: b
+    run: curl -sSL https://raw.githubusercontent.com/bww/psctl/refs/heads/master/README.md
