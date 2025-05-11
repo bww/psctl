@@ -351,13 +351,14 @@ fn order_procs<'a>(procs: Vec<&'a Process>) -> Result<Vec<&'a Process>> {
   // overhad and dependencies later.
   let mut sorted = procs.clone();
   sorted.sort_by(|a, b| {
-    // processes with fewer checks are ordered first
+    // processes with more checks are ordered first on the
+    // theory that they benefit from having more time to start
     let na = a.checks.len();
     let nb = b.checks.len();
     if na > nb {
-      return Ordering::Greater;
-    } else if na < nb {
       return Ordering::Less;
+    } else if na < nb {
+      return Ordering::Greater;
     }
     // processes with fewer dependencies are ordered first
     let na = a.deps.len();
