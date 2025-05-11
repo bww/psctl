@@ -360,7 +360,9 @@ fn order_procs<'a>(procs: Vec<&'a Process>) -> Result<Vec<&'a Process>> {
     } else if na < nb {
       return Ordering::Greater;
     }
-    // processes with fewer dependencies are ordered first
+    // processes with fewer dependencies are ordered first on the
+    // theory that they are more likely to be a dependency of
+    // another process
     let na = a.deps.len();
     let nb = b.deps.len();
     if na > nb {
@@ -368,7 +370,7 @@ fn order_procs<'a>(procs: Vec<&'a Process>) -> Result<Vec<&'a Process>> {
     } else if na < nb {
       return Ordering::Less;
     }
-    // otherwise, they have an equivalent starting order
+    // otherwise, the processes have an equivalent starting order
     Ordering::Equal
   });
 
