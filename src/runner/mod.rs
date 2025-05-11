@@ -164,7 +164,7 @@ impl Pod {
       if let Some(pid) = proc.id() { // negative-pid addresses the process group
         if let Err(err) = signal::kill(Pid::from_raw(-(pid as i32)), Signal::SIGTERM) {
           eprintln!("{}", &format!("~~~~> {} [failed] {}", spec, err).bold());
-          continue; // could not kill this one; move on
+          continue; // could not kill this one, it has possibly already exited; move on
         }
         match proc.wait().await {
           Ok(_) => {
@@ -202,7 +202,9 @@ pub struct Process {
   #[serde(default="Vec::new")]
   checks: Vec<String>,
   #[serde(with = "humantime_serde", default="wait_default")]
-  wait: time::Duration
+  wait: time::Duration,
+  #[serde(default="HashMap::new")]
+  env: HashMap<String, String>,
 }
 
 impl Process {
@@ -216,6 +218,7 @@ impl Process {
         None => vec![],
       },
       wait: wait_default(),
+      env: HashMap::new(),
     }
   }
 
@@ -306,6 +309,9 @@ impl Process {
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
     cmd.process_group(0); // use a process group to clean up children; providing '0' uses this process' id for the group
+    for (key, val) in self.env.iter() {
+      cmd.env(key, val);
+    }
     cmd.arg("-c").arg(self.command());
     Ok(cmd.into())
   }
