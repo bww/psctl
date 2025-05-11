@@ -4,7 +4,7 @@ use core::time;
 
 use std::io;
 use std::fmt;
-use std::cmp::min;
+use std::cmp::{min, Ordering};
 use std::result;
 use std::pin::Pin;
 use std::process::Stdio;
@@ -345,10 +345,36 @@ fn order_procs<'a>(procs: Vec<&'a Process>) -> Result<Vec<&'a Process>> {
   let mut set: HashMap<String, &'a Process> = HashMap::new();
   let mut path: Vec<&'a Process> = Vec::new();
 
-  for proc in &procs {
+  // initialize the starting order for processes according to the number
+  // of checks and dependencies they have; the intention is to start the
+  // processes with less overhead first and the processes with the greatest
+  // overhad and dependencies later.
+  let mut sorted = procs.clone();
+  sorted.sort_by(|a, b| {
+    // processes with fewer checks are ordered first
+    let na = a.checks.len();
+    let nb = b.checks.len();
+    if na > nb {
+      return Ordering::Greater;
+    } else if na < nb {
+      return Ordering::Less;
+    }
+    // processes with fewer dependencies are ordered first
+    let na = a.deps.len();
+    let nb = b.deps.len();
+    if na > nb {
+      return Ordering::Greater;
+    } else if na < nb {
+      return Ordering::Less;
+    }
+    // otherwise, they have an equivalent starting order
+    Ordering::Equal
+  });
+
+  for proc in &sorted {
     set.insert(proc.key().to_string(), proc);
   }
-  for proc in &procs {
+  for proc in &sorted {
     ord.append(&mut order_procs_sub(proc, &set, &mut HashSet::new(), &mut vis, &mut path)?);
   }
 
@@ -393,21 +419,23 @@ mod tests {
     let p2 = Process::new(Some("p2"), "proc 2", vec!["p1"], None);
     let p3 = Process::new(Some("p3"), "proc 3", vec!["p2", "p1"], None);
     let p4 = Process::new(Some("p4"), "proc 4", vec!["p1"], None);
+    let p5 = Process::new(Some("p5"), "proc 5", vec![], None);
+    let p6 = Process::new(Some("p6"), "proc 6", vec![], None);
 
-    match order_procs(vec![&p2, &p3, &p1]) {
-      Ok(res)  => assert_eq!(vec![&p1, &p2, &p3], res),
+    match order_procs(vec![&p2, &p3, &p1, &p5, &p6]) {
+      Ok(res)  => assert_eq!(vec![&p1, &p5, &p6, &p2, &p3], res),
       Err(err) => panic!("{}", err),
     };
-    match order_procs(vec![&p2, &p4, &p3, &p1]) {
-      Ok(res)  => assert_eq!(vec![&p1, &p2, &p4, &p3], res),
+    match order_procs(vec![&p2, &p4, &p3, &p1, &p6, &p5]) {
+      Ok(res)  => assert_eq!(vec![&p1, &p6, &p5, &p2, &p4, &p3], res),
       Err(err) => panic!("{}", err),
     };
 
     // circular
-    let p5 = Process::new(Some("p5"), "proc 5", vec!["p6"], None);
-    let p6 = Process::new(Some("p6"), "proc 6", vec!["p5"], None);
+    let p7 = Process::new(Some("p7"), "proc 7", vec!["p8"], None);
+    let p8 = Process::new(Some("p8"), "proc 8", vec!["p7"], None);
 
-    match order_procs(vec![&p5, &p6]) {
+    match order_procs(vec![&p7, &p8]) {
       Ok(_)    => panic!("Cannot succeed!"),
       Err(err) => match err {
         error::Error::DependencyError(error::DependencyError::Cycle(_)) => {}, // expected error
