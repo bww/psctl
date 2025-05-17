@@ -1,6 +1,7 @@
 use colored::{Color, Style, Colorize, ColoredString};
 
 /// Wheel is a color wheel instance
+#[derive(Clone)]
 pub struct Wheel {
   colors: Vec<Color>,
   style: Style,

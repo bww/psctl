@@ -46,6 +46,14 @@ impl Pod {
     }
   }
 
+  pub fn overlay(&self, procs: Vec<Process>) -> Pod {
+    Pod{
+      opts: self.opts.clone(),
+      procs: [self.procs.clone(), procs].concat(),
+      wheel: self.wheel.clone(),
+    }
+  }
+
   pub async fn exec(&self, rx: &mut mpsc::Receiver<()>) -> Result<i32> {
     let ord: Vec<&Process> = order_procs(self.procs.iter().map(|e| e).collect())?;
     let mut tset: Vec<(&Process, process::Command)> = Vec::new();
@@ -191,7 +199,7 @@ fn wait_default() -> time::Duration {
   return time::Duration::from_secs(30)
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct Process {
   #[serde(rename(serialize="run", deserialize="run"))]
   command: String,
