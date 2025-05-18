@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::Path;
 use std::process;
 
 use tokio::sync::mpsc;
@@ -35,15 +36,13 @@ async fn cmd() -> Result<i32, error::Error> {
     }).expect("Failed to propagate signal")
   }).expect("Failed to set Ctrl-C handler");
 
-  let procs = if let Some(file) = &opts.file {
-    read_procs(file)?.tasks
-  }else{
-    let mut procs = Vec::new();
-    for e in &opts.specs {
-      procs.push(runner::Process::parse(e)?);
-    }
-    procs
-  };
+  let mut procs = Vec::new();
+  // load taskfiles in the order they are specified...
+  for file in &opts.files {
+    procs.append(&mut read_procs(file)?);
+  }
+  // ...then load specs, if any, provided on the command line
+  procs.append(&mut read_specs(&opts.specs)?);
 
   if opts.debug() {
     let name = env!("CARGO_PKG_NAME");
@@ -64,7 +63,16 @@ struct SpecFile {
   tasks: Vec<runner::Process>,
 }
 
-fn read_procs(path: &str) -> Result<SpecFile, error::Error> {
+fn read_procs(path: &str) -> Result<Vec<runner::Process>, error::Error> {
   let data = fs::read_to_string(path)?;
-  Ok(serde_yaml::from_str(&data)?)
+  let specs = serde_yaml::from_str::<SpecFile>(&data)?.tasks;
+  Ok(specs.iter().map(|e| e.with_origin(path)).collect())
+}
+
+fn read_specs(specs: &Vec<String>) -> Result<Vec<runner::Process>, error::Error> {
+  let mut procs = Vec::new();
+  for e in specs {
+    procs.push(runner::Process::parse(Some("STDIN"), e)?);
+  }
+  Ok(procs)
 }

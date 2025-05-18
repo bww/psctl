@@ -17,8 +17,8 @@ pub struct Options {
   pub verbose: bool,
   #[clap(long, short='q', help="Enable quiet mode, only managed process output and errors are displayed")]
   pub quiet: bool,
-  #[clap(long, short='f', help="Load process specifiers from a taskfile")]
-  pub file: Option<String>,
+  #[clap(long="file", short='f', help="Load process specifiers from a taskfile")]
+  pub files: Vec<String>,
   #[clap(
     help_heading="SPECIFIERS",
     help="Task specifiers to run and manage. When a taskfile is provided, it is preferred over specifiers provided on the command line.

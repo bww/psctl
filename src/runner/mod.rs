@@ -203,6 +203,8 @@ fn wait_default() -> time::Duration {
 pub struct Process {
   #[serde(rename(serialize="run", deserialize="run"))]
   command: String,
+  #[serde()]
+  origin: Option<String>,
   #[serde(rename(serialize="name", deserialize="name"))]
   label: Option<String>,
   #[serde(default="Vec::new")]
@@ -216,8 +218,9 @@ pub struct Process {
 }
 
 impl Process {
-  pub fn new(label: Option<&str>, cmd: &str, deps: Vec<&str>, url: Option<&str>) -> Process {
+pub fn new(origin: Option<&str>, label: Option<&str>, cmd: &str, deps: Vec<&str>, url: Option<&str>) -> Process {
     Process{
+      origin: origin.map(|origin| origin.to_owned()),
       command: cmd.to_owned(),
       label: label.map(|label| label.to_owned()),
       deps: deps.iter().map(|e| e.to_string()).collect(),
@@ -231,7 +234,7 @@ impl Process {
   }
 
   // <label> [+ <dep1> [, ...]]: <command>=<check url>
-  pub fn parse(text: &str) -> Result<Process> {
+  pub fn parse(origin: Option<&str>, text: &str) -> Result<Process> {
     let split: Vec<&str> = text.splitn(2, ":").collect();
     let (label, text) = match split.len() {
       2 => (Some(split[0].trim()), split[1].trim()),
@@ -258,7 +261,13 @@ impl Process {
       _ => return Err(error::ExecError::new(&format!("Invalid process format: {}", text)).into()),
     };
 
-    Ok(Self::new(label, cmd, deps, check))
+    Ok(Self::new(origin, label, cmd, deps, check))
+  }
+
+  pub fn with_origin(&self, origin: &str) -> Process {
+    let mut dup = self.clone();
+    dup.origin = Some(origin.to_owned());
+    dup
   }
 
   fn key(&self) -> &str {
@@ -397,10 +406,10 @@ mod tests {
 
   #[test]
   fn test_resolve_deps() {
-    let p1 = Process::new(Some("p1"), "proc 1", vec![], None);
-    let p2 = Process::new(Some("p2"), "proc 2", vec!["p1"], None);
-    let p3 = Process::new(Some("p3"), "proc 3", vec!["p2", "p1"], None);
-    let p4 = Process::new(Some("p4"), "proc 4", vec!["p1"], None);
+    let p1 = Process::new(None, Some("p1"), "proc 1", vec![], None);
+    let p2 = Process::new(None, Some("p2"), "proc 2", vec!["p1"], None);
+    let p3 = Process::new(None, Some("p3"), "proc 3", vec!["p2", "p1"], None);
+    let p4 = Process::new(None, Some("p4"), "proc 4", vec!["p1"], None);
 
     match order_procs(vec![&p2, &p3, &p1]) {
       Ok(res)  => assert_eq!(vec![&p1, &p2, &p3], res),
@@ -412,8 +421,8 @@ mod tests {
     };
 
     // circular
-    let p5 = Process::new(Some("p5"), "proc 5", vec!["p6"], None);
-    let p6 = Process::new(Some("p6"), "proc 6", vec!["p5"], None);
+    let p5 = Process::new(None, Some("p5"), "proc 5", vec!["p6"], None);
+    let p6 = Process::new(None, Some("p6"), "proc 6", vec!["p5"], None);
 
     match order_procs(vec![&p5, &p6]) {
       Ok(_)    => panic!("Cannot succeed!"),
