@@ -1,4 +1,5 @@
 pub mod error;
+pub mod util;
 
 use core::time;
 
@@ -207,6 +208,7 @@ pub struct Process {
   origin: Option<String>,
   #[serde(rename(serialize="name", deserialize="name"))]
   label: Option<String>,
+  qualified_label: Option<String>,
   #[serde(default="Vec::new")]
   deps: Vec<String>,
   #[serde(default="Vec::new")]
@@ -218,7 +220,7 @@ pub struct Process {
 }
 
 impl Process {
-pub fn new(origin: Option<&str>, label: Option<&str>, cmd: &str, deps: Vec<&str>, url: Option<&str>) -> Process {
+  pub fn new(origin: Option<&str>, label: Option<&str>, cmd: &str, deps: Vec<&str>, url: Option<&str>) -> Process {
     Process{
       origin: origin.map(|origin| origin.to_owned()),
       command: cmd.to_owned(),
@@ -230,6 +232,7 @@ pub fn new(origin: Option<&str>, label: Option<&str>, cmd: &str, deps: Vec<&str>
       },
       wait: wait_default(),
       env: HashMap::new(),
+      qualified_label: util::join_labels(vec![origin, label], '/'),
     }
   }
 
@@ -271,9 +274,12 @@ pub fn new(origin: Option<&str>, label: Option<&str>, cmd: &str, deps: Vec<&str>
   }
 
   fn key(&self) -> &str {
-    match self.label() {
-      Some(label) => label,
-      None => self.command(),
+    if let Some(qlabel) = self.qualified_label() {
+      qlabel
+    } else if let Some(label) = self.label() {
+      label
+    } else{
+      self.command()
     }
   }
 
@@ -290,6 +296,13 @@ pub fn new(origin: Option<&str>, label: Option<&str>, cmd: &str, deps: Vec<&str>
 
   pub fn label(&self) -> Option<&str> {
     match &self.label {
+      Some(label) => Some(label),
+      None => None,
+    }
+  }
+
+  pub fn qualified_label(&self) -> Option<&str> {
+    match &self.qualified_label {
       Some(label) => Some(label),
       None => None,
     }

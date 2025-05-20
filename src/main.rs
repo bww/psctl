@@ -66,7 +66,8 @@ struct SpecFile {
 fn read_procs(path: &str) -> Result<Vec<runner::Process>, error::Error> {
   let data = fs::read_to_string(path)?;
   let specs = serde_yaml::from_str::<SpecFile>(&data)?.tasks;
-  Ok(specs.iter().map(|e| e.with_origin(path)).collect())
+  let origin = origin_from_path(path)?;
+  Ok(specs.iter().map(|e| e.with_origin(&origin)).collect())
 }
 
 fn read_specs(specs: &Vec<String>) -> Result<Vec<runner::Process>, error::Error> {
@@ -75,4 +76,14 @@ fn read_specs(specs: &Vec<String>) -> Result<Vec<runner::Process>, error::Error>
     procs.push(runner::Process::parse(Some("STDIN"), e)?);
   }
   Ok(procs)
+}
+
+const INVALID_PATH: &str = "<invalid>";
+
+fn origin_from_path(path: &str) -> Result<String, error::Error> {
+  let path = match Path::new(path).file_name() {
+    Some(path) => path.to_str().unwrap_or(INVALID_PATH),
+    None       => INVALID_PATH,
+  };
+  Ok(path.to_owned())
 }
