@@ -1,4 +1,6 @@
 
+pub const LABEL_SEP: char = '/';
+
 pub fn join_labels<'a, I: IntoIterator<Item = Option<&'a str>>>(opts: I, sep: char) -> Option<String> {
   let mut s = String::new();
   let mut o = opts.into_iter();
