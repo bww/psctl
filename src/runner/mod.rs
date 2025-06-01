@@ -85,7 +85,7 @@ impl Pod {
       };
 
       let key_stdout = match self.opts.prefix() {
-        true  => Some(format!("[ {} ]", self.wheel.colorize(i, spec.key_with_padding(maxkey)))),
+        true  => Some(self.wheel.colorize(i, format!("{} ┃", spec.key_with_padding(maxkey)))),
         false => None,
       };
       tokio::spawn(async move {
@@ -97,7 +97,7 @@ impl Pod {
       });
 
       let key_stderr = match self.opts.prefix() {
-        true  => Some(format!("[ {} ]", self.wheel.colorize(i, spec.key_with_padding(maxkey)))),
+        true  => Some(self.wheel.colorize(i, format!("{} ┃", spec.key_with_padding(maxkey)))),
         false => None,
       };
       tokio::spawn(async move {
