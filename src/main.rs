@@ -64,7 +64,22 @@ struct SpecFile {
   tasks: Vec<runner::Process>,
 }
 
+impl SpecFile {
+  fn with_tasks(&self, tasks: Vec<runner::Process>) -> Self {
+    Self {
+      version: self.version,
+      tasks: tasks,
+    }
+  }
+}
+
 fn read_procs(path: &str) -> Result<SpecFile, error::Error> {
+  let origin = runner::Origin::new(path);
   let data = fs::read_to_string(path)?;
-  Ok(serde_yaml::from_str(&data)?)
+  let spec: SpecFile = serde_yaml::from_str(&data)?;
+  let mut tasks: Vec<runner::Process> = Vec::new();
+  for e in &spec.tasks {
+    tasks.push(e.with_origin(origin.clone()));
+  }
+  Ok(spec.with_tasks(tasks))
 }
