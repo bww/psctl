@@ -5,6 +5,7 @@ use core::time;
 use std::io;
 use std::fmt;
 use std::cmp::min;
+use std::path;
 use std::result;
 use std::pin::Pin;
 use std::process::Stdio;
@@ -191,8 +192,29 @@ fn wait_default() -> time::Duration {
   return time::Duration::from_secs(30)
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Clone)]
+pub struct Origin {
+  definition: Option<path::PathBuf>,
+}
+
+impl Origin {
+  pub fn new<P: AsRef<path::Path>>(def: P) -> Self {
+    Self{
+      definition: Some(def.as_ref().into()),
+    }
+  }
+
+  pub fn unknown() -> Self {
+    Self{
+      definition: None,
+    }
+  }
+}
+
+#[derive(PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct Process {
+  #[serde(default="Origin::unknown")]
+  origin: Origin,
   #[serde(rename(serialize="run", deserialize="run"))]
   command: String,
   #[serde(rename(serialize="name", deserialize="name"))]
@@ -209,7 +231,12 @@ pub struct Process {
 
 impl Process {
   pub fn new(label: Option<&str>, cmd: &str, deps: Vec<&str>, url: Option<&str>) -> Process {
+    return Self::new_with_origin(label, cmd, deps, url, Origin::unknown())
+  }
+
+  pub fn new_with_origin(label: Option<&str>, cmd: &str, deps: Vec<&str>, url: Option<&str>, origin: Origin) -> Process {
     Process{
+      origin: origin,
       command: cmd.to_owned(),
       label: label.map(|label| label.to_owned()),
       deps: deps.iter().map(|e| e.to_string()).collect(),
@@ -220,6 +247,12 @@ impl Process {
       wait: wait_default(),
       env: HashMap::new(),
     }
+  }
+
+  pub fn with_origin(&self, origin: Origin) -> Self {
+    let mut dup = self.clone();
+    dup.origin = origin;
+    dup
   }
 
   // <label> [+ <dep1> [, ...]]: <command>=<check url>
@@ -309,6 +342,11 @@ impl Process {
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
     cmd.process_group(0); // use a process group to clean up children; providing '0' uses this process' id for the group
+    if let Some(def) = &self.origin.definition {
+      if let Some(dir) = def.parent() {
+        cmd.current_dir(dir);
+      }
+    }
     for (key, val) in self.env.iter() {
       cmd.env(key, val);
     }
