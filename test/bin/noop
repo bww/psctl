@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+me="$0"
+me_home=$(dirname "$0")
+me_home=$(cd "$me_home" && pwd)
+
+echo "${me_home}/$(basename "$0")"
