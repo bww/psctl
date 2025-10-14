@@ -6,10 +6,10 @@ use clap::Parser;
   about = "Process Control is an operator for interdependent processes.
 https://crates.io/crates/psctl",
   long_about = None,
-  after_help = "EXAMPLES:
+  after_help = "\x1b[33mEXAMPLES:\x1b[0m
+    $ psctl 'a: echo A' 'b: echo B=file:///tmp/file' 'c +a,b: echo C'
 
-    $ psctl 'a: echo A' 'b: echo B=file:///tmp/file' 'c +a,b: echo C'"
-)]
+")]
 pub struct Options {
   #[clap(long, help="Enable debugging mode")]
   pub debug: bool,
@@ -38,10 +38,6 @@ READINESS CHECKS
     http(s)://...      The check passes when the URL returns 2XX
     file://...         The check passes when the file exists
     shell://<command>  The check passes when the command exits with status 0
-
-EXAMPLE
-
-    $ psctl 'a: echo A' 'b: echo B=file:///tmp/file' 'c +a,b: echo C'
 ")]
   pub specs: Vec<String>,
 }
